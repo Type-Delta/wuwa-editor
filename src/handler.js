@@ -330,7 +330,7 @@ function readPlainText(configPath){
       return fs.readFileSync(configPath, { encoding: 'utf-8' });
    }
    catch (e) {
-      writeLog(`${ncc(color.gold)}[error]${ncc()} Error reading config from "${configPath}": ${e.message}`, 2, true);
+      writeLog(`Error reading config from "${configPath}": ${e.message}`, 1, true);
       writeLog(to.yuString(e), 2);
       return null;
    }
@@ -343,14 +343,14 @@ function readPlainText(configPath){
  */
 async function readSQLite(filePath, settingSrc){
    if(settingSrc.manifest?.selectedTable === undefined){
-      writeLog(`${ncc(color.gold)}[warn]${ncc()} unable to read from SQLite database: missing "selectedTable" property in source metadata`, 3, true);
-      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 3);
+      writeLog(`unable to read from SQLite database: missing "selectedTable" property in source metadata`, 2, true);
+      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
       return null;
    }
 
    if(!(settingSrc.manifest?.acceptedGroups?.length)){
-      writeLog(`${ncc(color.gold)}[warn]${ncc()} unable to read from SQLite database: missing "acceptedGroups" property in source metadata`, 3, true);
-      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 3);
+      writeLog(`unable to read from SQLite database: missing "acceptedGroups" property in source metadata`, 2, true);
+      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
       return null;
    }
 
@@ -363,14 +363,14 @@ async function readSQLite(filePath, settingSrc){
    let db = null;
    let rawSettings = [];
    try {
-      writeLog(`Opening SQLite database from "${filePath}"`, 3);
+      writeLog(`Opening SQLite database from "${filePath}"`);
       db = await open({
          filename: filePath, // absolute path only!
          driver: sqlite3.Database
       });
 
       for(const group of settingSrc.manifest.acceptedGroups){
-         writeLog(`executing SQL: \`SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'\``, 3, true);
+         writeLog(`executing SQL: \`SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'\``, 4);
 
          const result = await db.all(
             `SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'`
@@ -378,14 +378,14 @@ async function readSQLite(filePath, settingSrc){
 
          if(!result.length){
             writeLog(
-               `${ncc(color.gold)}[warn]${ncc()} SQLite failed to resolve setting from "${filePath}"`,
-               3, true
+               `SQLite failed to resolve setting from "${filePath}"`,
+               2, true
             );
-            writeLog('failed reason: "no result"', 3);
+            writeLog('failed reason: "no result"', 2);
             return null;
          }
 
-         writeLog(`query result: ${to.yuString(result)}`, 3);
+         writeLog(`query result: ${to.yuString([...result])}`);
          rawSettings.push(result[0]);
       }
 
@@ -393,14 +393,14 @@ async function readSQLite(filePath, settingSrc){
 
    } catch (e) {
       writeLog(
-         `${ncc(color.gold)}[warn]${ncc()} Error loading SQLite from "${filePath}": ${e.message}`,
-         3, true
+         `Error loading SQLite from "${filePath}": ${e.message}`,
+         2, true
       );
-      writeLog(to.yuString(e), 3);
+      writeLog(to.yuString(e), 2);
       return null;
 
    } finally {
-      writeLog('Closing SQLite database', 3);
+      writeLog('Closing SQLite database');
       db.close();
    }
 }
@@ -448,8 +448,8 @@ function parseIniKeyVal(rawSetting, settingKey){
 
    if(setting?.[settingKey] == undefined){
       writeLog(
-         `${ncc(color.gold)}[warn]${ncc()} Key "${settingKey}" not found in source config`,
-         3, true
+         `Key "${settingKey}" not found in source config`,
+         2, true
       );
       return null;
    }
@@ -509,7 +509,8 @@ async function writeIniKeyVal(settingScrPath, settingSrc, settings){
 
    let withGroup = {};
 
-   if(settingSrc.manifest.settingGroups){
+   // some src files may not have manifest, it's okay
+   if(settingSrc.manifest?.settingGroups){
       let groupedKeys = [];
       for(const groupName in settingSrc.manifest.settingGroups){
          for(const key in noGroup){
@@ -544,7 +545,7 @@ async function writeIniKeyVal(settingScrPath, settingSrc, settings){
 
    if(to.propertiesCount(withGroup) < 1){
       writeLog(
-         `${ncc(color.gold)}[warn]${ncc()} settings write preparation failed: no settings to write to "${settingScrPath}`, 3
+         `settings write preparation failed: no settings to write to "${settingScrPath}`, 2
       );
       return;
    }
@@ -610,17 +611,17 @@ async function loadJSON(configPath, settingSrc) {
 async function writeSQLite(filePath, settingSrc, settings){
    if(settingSrc.manifest?.selectedTable === undefined){
       writeLog(
-         `${ncc(color.gold)}[warn]${ncc()} unable to write to SQLite database: missing "selectedTable" property in source metadata`, 3
+         `unable to write to SQLite database: missing "selectedTable" property in source metadata`, 2
       );
-      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 3);
+      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
       return false;
    }
 
    if(!(settingSrc.manifest?.acceptedGroups?.length)){
       terminal.warn(
-         `${ncc(color.gold)}[warn]${ncc()} unable to write to SQLite database: missing "acceptedGroups" property in source metadata`, 3
+         `unable to write to SQLite database: missing "acceptedGroups" property in source metadata`, 2
       );
-      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 3);
+      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
       return false;
    }
 
@@ -636,7 +637,7 @@ async function writeSQLite(filePath, settingSrc, settings){
     */
    let db = null;
    try {
-      writeLog(`Opening SQLite database from "${filePath}"`, 3);
+      writeLog(`Opening SQLite database from "${filePath}"`);
       db = await open({
          filename: filePath, // absolute path only!
          driver: sqlite3.Database
@@ -646,7 +647,7 @@ async function writeSQLite(filePath, settingSrc, settings){
       for(const group of settingSrc.manifest.acceptedGroups){
          if(settings[group] == undefined){
             writeLog(
-               `${ncc(color.gold)}[warn]${ncc()} Error writting to SQLite database "${filePath}": the group "${group}" does not exist in settings`, 3
+               `Error writting to SQLite database "${filePath}": the group "${group}" does not exist in settings`, 2
             );
             continue;
          }
@@ -658,7 +659,7 @@ async function writeSQLite(filePath, settingSrc, settings){
 
          if(!res.length){
             writeLog(
-               `${ncc(color.gold)}[warn]${ncc()} Error writting to SQLite database "${filePath}": the group "${group}" does not exist in 'key' column in database`, 3
+               `Error writting to SQLite database "${filePath}": the group "${group}" does not exist in 'key' column in database`, 2
             );
             return false;
          }
@@ -668,7 +669,7 @@ async function writeSQLite(filePath, settingSrc, settings){
             ? settings[group]
             : JSON.stringify(settings[group], settingSrc.manifest.Replacer);
 
-         writeLog(`executing SQL: \`UPDATE ${settingSrc.manifest.selectedTable} SET value = '${settingStr}' WHERE key == '${group}'\``, 3);
+         writeLog(`executing SQL: \`UPDATE ${settingSrc.manifest.selectedTable} SET value = '${settingStr}' WHERE key == '${group}'\``);
          await db.all(
             `UPDATE ${settingSrc.manifest.selectedTable} SET value = '${settingStr}' WHERE key == '${group}'`
          );
@@ -676,13 +677,13 @@ async function writeSQLite(filePath, settingSrc, settings){
    }
    catch (e) {
       writeLog(
-         `${ncc(color.gold)}[warn]${ncc()} Error writting to SQLite database "${filePath}": ${e.message}`, 3
+         `Error writting to SQLite database "${filePath}": ${e.message}`, 2
       );
-      writeLog(to.yuString(e), 3);
+      writeLog(to.yuString(e), 2);
       return false;
    }
    finally {
-      writeLog('Closing SQLite database', 3);
+      writeLog('Closing SQLite database');
       db?.close();
    }
 
@@ -892,7 +893,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
 
    const mappedSettings = to.remap(parsed, (key, setting, currMap) => {
       if(!(setting.type === 'bindings' || setting.type === 'axis')){
-         writeLog(`${ncc(color.gold)}[warn]${ncc()} invalid type "${setting.type}" for KBTupleMap`, 3);
+         writeLog(`invalid type "${setting.type}" for KBTupleMap`, 2);
          return;
       }
 
@@ -1019,11 +1020,11 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
    }
 
    try {
-      writeLog(`Writing KBTupleMap to "${settingScrPath}"`, 3);
+      writeLog(`Writing KBTupleMap to "${settingScrPath}"`);
       fs.writeFileSync(settingScrPath, content, { encoding: 'utf-8' });
    }
    catch(e){
-      writeLog(`${ncc(color.gold)}[error]${ncc()} Error writing to "${settingScrPath}": ${e.message}`, 2);
+      writeLog(`Error writing to "${settingScrPath}": ${e.message}`, 1);
       throw e; // let the caller handle the error
    }
 

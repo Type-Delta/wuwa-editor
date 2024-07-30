@@ -8,6 +8,9 @@ const _global = require('./global.js');
 const terminal = require('./term.js');
 const config = require('./config.js');
 
+const { color } = _global;
+const { ncc } = to;
+
 /**
  * Check if a process is running
  */
@@ -127,20 +130,29 @@ function closeLogFile() {
 /**
  * stream write log message waiting to be written
  * @param {any} message
- * @param {4|3|2|1} level message level, debug: 4, normal: 3, error: 2, critical: 1
+ * @param {4|3|2|1|0} level message level, debug: 4, normal: 3, warn: 2, error: 1, critical: 0
  * @param {boolean} [print=false] whether to print the message to terminal
  */
 function writeLog(message, level = 3, print = false) {
+   if(typeof message !== 'string'){
+      message = to.yuString(message);
+   }
+
+   switch (level) {
+      case 4: message = ncc('Dim') + '[debug] ' + ncc() + message; break;
+      case 3: message = ncc(color.mikuCyan) + '[info] ' + ncc() + message; break;
+      case 2: message = ncc('Yellow')+ '[warn] ' + ncc() + message; break;
+      case 1: message = ncc('Red')+'[error] ' + ncc() + message; break;
+      case 0: message = ncc('Red')+ncc('Bright')+'[critical] ' + ncc() + message; break;
+   }
+
    if(print){
       terminal.log(message);
    }
 
-   if(_global.logFileWS === null) return false;
+   message = to.cleanString(message);
 
-   if(typeof message !== 'string'){
-      message = to.cleanString(to.yuString(message));
-   }
-   else message = to.cleanString(message);
+   if(_global.logFileWS === null) return false;
 
    const D = new Date();
    let time = [
@@ -152,14 +164,9 @@ function writeLog(message, level = 3, print = false) {
       D.getSeconds().toString()
    ].map(t => t.padStart(2, '0'));
 
-   switch (level) {
-      case 4: message = '[DEBUG] ' + message; break;
-      case 3: message = '[INFO] ' + message; break;
-      case 2: message = '[ERROR] ' + message; break;
-      case 1: message = '[CRITICAL] ' + message; break;
-   }
 
-   const content = to.strWrap(message, 70, {
+
+   const content = to.strWrap(message, 130, {
       firstIndent: `${time[0]+time[1]+time[2]}T${time[3]}:${time[4]}:${time[5]}| `,
       indent: '                 | ',
       redundancyLv: -1

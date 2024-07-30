@@ -67,6 +67,7 @@ describe('Tools.js', () => {
 
             it('should not have Header if options.noHeader = true', () => {
                options.noHeader = true;
+               result = to.arrToString(testArr, options);
                expect(
                   to.arrToString(testArr, options).startsWith('Array(')
                ).to.be.false;
@@ -74,6 +75,7 @@ describe('Tools.js', () => {
             });
 
             it('the header should contain currect dimensions of the array', () => {
+               result = to.arrToString(testArr, options);
                expect(result.split(': ')[0]).to.equal('Array(3,4,5,5)');
             });
 
@@ -86,6 +88,12 @@ describe('Tools.js', () => {
                expect(result).to.includes('[anonymous] () => {...}');
             });
 
+            it('should NOT apply syntax highlighting if `options.color = false`', () => {
+               expect(
+                  to.REGEXP.ANSICode.test(result)
+               ).to.be.false;
+            });
+
             it('should apply syntax highlighting if `options.color = true`', () => {
                options.color = true;
                result = to.arrToString(testArr, options);
@@ -96,7 +104,6 @@ describe('Tools.js', () => {
             });
 
             it('should return `Tools.yuString()` of the given object if it is not an array', () => {
-               options.color = false;
                expect(to.arrToString(af, options), 'input is function')
                   .to.equal(to.yuString(af));
 
@@ -141,7 +148,7 @@ describe('Tools.js', () => {
                options.maxDepth = 4;
             });
 
-            it('should collapse the array if the array is too long', () => {
+            it('should collapse nested array if the array is too long', () => {
                const hasCollapsed_r = /\.\.\. \(\d+ more\)/;
 
                options.maxCol = 2;

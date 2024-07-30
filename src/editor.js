@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const _ = require('lodash');
-const isElevated = require('is-elevated');
+let isElevated = null; // require('is-elevated')
 
 
 const to = require('./helper/Tools');
@@ -151,7 +151,7 @@ const {
  * @property {string} displayName a friendly name for the source
  * @property {string} description a brief description of the source
  * @property {string} path relative path from game root folder to the source file
- * @property {SettingSrcMetadataManifest} manifest define how setting is parsed and grouped etc. in the source file
+ * @property {SettingSrcMetadataManifest?} manifest define how setting is parsed and grouped etc. in the source file
  * @property {boolean|undefined} configurable whether the settings in this source file can be configure and modified DIRECTLY by the user (user can see and edit the setting in the editor)
  * @property {boolean|undefined} usedAsRaw whether the settings in this source file is used as raw data (we shouldn't parse this setting)
  */
@@ -241,24 +241,23 @@ terminal.on('code', async (code) => {
 
 process.on('beforeExit', doShutdownTask);
 
-
 (async () => {
    await doStartupTask();
 
    if(!_global.isThisProcessElevated){
       terminal.log(
-         `${ncc(color.red)}[error]${ncc()} This program must be run as administrator`
+         `${ncc('Red')}[error]${ncc()} This program must be run as administrator`
       );
       return doShutdownTask(1);
    }
 
    checkInstalledPath:
    if(!config.gameInstalledPath){
-      writeLog(`${ncc(color.mikuCyan)}[info]${ncc()} No game folder set. Looking for it in process list...`, 3, true);
+      writeLog('No game folder set. Looking for it in process list...', 3, true);
       const isRunning = await isProcessRunning(config.gameClientName);
 
       if(!isRunning){
-         writeLog('Game not found in process list.', 3);
+         writeLog('Game not found in process list.');
          terminal.log(`${ncc(color.mikuCyan)}[info]${ncc()} Game not found in process list.
 
 You can set the game installation folder manually or run the game (for auto detection).
@@ -284,7 +283,7 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
                const isRunning = await isProcessRunning(config.gameClientName);
                if (isRunning) {
                   terminal.clearLine();
-                  writeLog(`${ncc(color.mikuCyan)}[info]${ncc()} Game process found! resolving path...`, 3, true);
+                  writeLog('Game process found! resolving path...', 3, true);
                   break;
                } else {
                   terminal.write(ncc(color.mikuCyan) + ''.padEnd(dotCount, '.') + ncc(), true);
@@ -298,7 +297,7 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
 
       config.gameInstalledPath = await getProcessPath(config.gameClientName);
       if(!config.gameInstalledPath){
-         writeLog(`${ncc('Yellow')}[info]${ncc()} Failed to resolve game path.`, 3, true);
+         writeLog('Failed to resolve game path.', 2, true);
          terminal.log(`please enter the game folder manually.`);
 
          await promptForGamePath();
@@ -326,12 +325,12 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
    }
    else await to.asyncSleep(500);
 
-   // fs.writeFileSync('test/parsed.json', JSON.stringify(settings.parsed, to.JSONReplacer, 3));
-   // fs.writeFileSync('test/raw_settings.json', JSON.stringify(settings.allRawSettings, to.JSONReplacer, 3));
+   writeLog('Loading UI...', 3, true);
+
 
    terminal.log('\n'.padEnd(terminal.height - 1, '\n'));
    await showMainMenu(settings.parsed, patch, settingTFIDF, settingSearchFields);
-   process.exit(0);
+   doShutdownTask();
 })();
 
 
@@ -446,8 +445,8 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
    let maxRow = terminal.height - 5;
    let halfMaxRow = maxRow >> 1;
    let disp = [];
-   const terminalHalf = terminal.width >> 1;
-   const thisCatIsModified = [...changesBackup.values()]
+   const terminalHalfW = terminal.width >> 1;
+   const isCategoryModified = [...changesBackup.values()]
       .findIndex(v => v.catergory == category) !== -1;
 
    let i = -1;
@@ -464,7 +463,7 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
 
       if(disp.length >= maxRow) break;
 
-      const thisSettingIsModified = changesBackup.has(key);
+      const isSettingModified = changesBackup.has(key);
 
       if(i == selectedIndex){
          let sValue = '';
@@ -497,22 +496,22 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
 
 
          disp.push(
-            ncc(color.gray1, 'bg')+ncc(color.gray7)+'░ '+ncc(color.gray3, 'bg')+ncc(color.grayB)+ncc('Bright')+to.padEnd(` •${key + (thisSettingIsModified? ncc()+ncc(color.gray3, 'bg')+ncc('Yellow')+ ' [M]'+ncc(color.gray7):'')}`, terminalHalf - 3, ' ', 1)+ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7)+' '
+            ncc(color.gray1, 'bg')+ncc(color.gray7)+'░ '+ncc(color.gray3, 'bg')+ncc(color.grayB)+ncc('Bright')+to.padEnd(` •${key + (isSettingModified? ncc()+ncc(color.gray3, 'bg')+ncc('Yellow')+ ' [M]'+ncc(color.gray7):'')}`, terminalHalfW - 3, ' ', 1)+ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7)+' '
          );
       }
       else{
          disp.push(
-            ncc(color.gray1, 'bg')+ncc(color.gray7)+to.padEnd(`░  ${key + (thisSettingIsModified? ncc('Yellow')+ ' [M]'+ncc(color.gray7):'')}`, terminalHalf, ' ', 1)
+            ncc(color.gray1, 'bg')+ncc(color.gray7)+to.padEnd(`░  ${key + (isSettingModified? ncc('Yellow')+ ' [M]'+ncc(color.gray7):'')}`, terminalHalfW, ' ', 1)
          );
       }
    }
 
-   let descLines = to.strWrap(selDesc, (terminalHalf) - 2, {mode: 'softboundery', redundancyLv: 2})
+   let descLines = to.strWrap(selDesc, (terminalHalfW) - 2, {mode: 'softboundery', redundancyLv: 2})
       .split('\n');
 
    writeUI_splitScreen(
       to.strSurround(
-         category + (thisCatIsModified? ncc()+ncc(color.gray3, 'bg')+ncc('Yellow')+ ' ['+ncc('Italic')+'modified'+ncc()+ncc(color.gray3, 'bg')+ncc('Yellow')+']'+ncc(color.gray9):''),
+         category + (isCategoryModified? ncc()+ncc(color.gray3, 'bg')+ncc('Yellow')+ ' ['+ncc('Italic')+'modified'+ncc()+ncc(color.gray3, 'bg')+ncc('Yellow')+']'+ncc(color.gray9):''),
          ' ', terminal.width - 2
       ),
       disp,
@@ -536,7 +535,7 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
  * 3. select device type (keyboard, mouse, controller, modifier) (skip step 2)
  * 4. select binding key/axis
  * 5. (none)
- * 6. key input mode (enter key binging with key press) (only accessible in step 4 with keyboard device type)
+ * 6. key input mode (enter key binding with key press) (only accessible in step 4 with keyboard device type)
  *
  * **axis**
  * 1. select, add, remove binding or reset all binding to current setting
@@ -544,7 +543,7 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
  * 3. select device type (keyboard, mouse, controller)
  * 4. select binding key/axis
  * 5. set axis scaling (this step can only be reached if select "set scaling" in step 2)
- * 6. key input mode (enter key binging with key press) (only accessible in step 4 with keyboard device type)
+ * 6. key input mode (enter key binding with key press) (only accessible in step 4 with keyboard device type)
  * @property {'bindingsDeclaration'|'axisDeclaration'} bindingInputTypePatchName a key name in patch.json->`bindingsDeclaration` or `axisDeclaration`
  * @property {number} [selBindingIndex=0] current selected binding index, for **Bindings** and **Axis** type setting
  * @property {'mouse'|'controller'|'keyboard'|'modifiers'} bindingDeviceTypePatchName a key name in patch.json for the current selected input type
@@ -680,7 +679,7 @@ function drawSettingEditor(
                   rightPanelActive = true;
                   footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to confirm,  '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, value default to ' + ncc(color.mikuCyan) + '100' + ncc(color.gray9);
                   break;
-               case 6:  // 6. key input mode (enter key binging with key press) (only accessible in step 4 with keyboard device type)
+               case 6:  // 6. key input mode (enter key binding with key press) (only accessible in step 4 with keyboard device type)
                   leftPanelItems = Object.keys(patch[trackers.bindingInputTypePatchName][trackers.bindingDeviceTypePatchName]);
                   rightPanelActive = true;
                   footerMsg = ncc(color.mikuCyan)+'Press'+ncc(color.gray9)+' any key on your keyboard...,  '+ncc(color.mikuCyan)+'Ctrl+G'+ncc(color.gray9)+' to cancel';
@@ -1240,7 +1239,7 @@ async function showSettingEditMenu(settingsMap, settingIndex){
             }
          }
 
-         if(currentSetStep == 6){ // 6. key input mode (enter key binging with key press)
+         if(currentSetStep == 6){ // 6. key input mode (enter key binding with key press)
             if(key == terminal.Keys.CTRL_G){ // switch off key input mode
                KBEdit_gotoStep(4);
 
@@ -1762,8 +1761,8 @@ async function showMainMenu(settingsMap, patch, settingTFIDF, settingSearchField
                      inOtherMenu = false;
                      break KeySwitch;
                   case 4: // exit
-                     clearListeners();
-                     await exitProgram();
+                     const exitMsg = await exitProgram();
+                     if(exitMsg) statusMsg[0] = exitMsg;
                      break KeySwitch;
                }
 
@@ -1874,12 +1873,12 @@ async function showRestoreBackupMenu(){
 
 
 function loadPatch() {
-   writeLog(`${ncc(color.mikuCyan)}[info]${ncc()} Loading patch.json...`, 3, true);
+   writeLog(`Loading patch.json...`, 3, true);
 
    try {
       patch = JSON.parse(fs.readFileSync(config.patchJSONLocation, { encoding: 'utf-8' }));
    } catch (e) {
-      writeLog(`${ncc('Red')}[error]${ncc()} Error loading patch file: ${e.message}`, 2, true);
+      writeLog(`Error loading patch file: ${e.message}`, 1, true);
       hasErrorOrWarning = true;
       return;
    }
@@ -1902,8 +1901,8 @@ function loadPatch() {
             manifest.Replacer = createJSONReviver(manifest.Replacer);
          }
          else{
-            writeLog(`${ncc(color.gold)}[warn]${ncc()} Invalid Replacer for "${src}"`, 3, true);
-            writeLog(`Manifest: ${to.yuString(manifest)}`, 3);
+            writeLog(`Invalid Replacer for "${src}"`, 1, true);
+            writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
             manifest.Replacer = null;
             hasErrorOrWarning = true;
             continue;
@@ -1922,8 +1921,8 @@ function loadPatch() {
             manifest.Reviver = createJSONReviver(manifest.Reviver);
          }
          else{
-            writeLog(`${ncc(color.gold)}[warn]${ncc()} Invalid Reviver for "${src}"`, 3, true);
-            writeLog(`Manifest: ${to.yuString(manifest)}`, 3);
+            writeLog(`Invalid Reviver for "${src}"`, 1, true);
+            writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
             manifest.Reviver = null;
             hasErrorOrWarning = true;
             continue;
@@ -1934,20 +1933,20 @@ function loadPatch() {
 
 
 function verifyGamePath(gamePath) {
-   writeLog(`${ncc(color.mikuCyan)}[info]${ncc()} Verifying game paths...`, 3, true);
+   writeLog(`Verifying game paths...`, 3, true);
 
    if (!gamePath) {
-      writeLog(`${ncc('Red')}[error]${ncc()} Game folder is not set. Please set it in the config file or run the game first.`, 2, true);
+      writeLog(`Game folder is not set. Please set it in the config file or run the game first.`, 1, true);
       return false;
    }
 
    if (!fs.existsSync(gamePath)) {
-      writeLog(`${ncc('Red')}[error]${ncc()} Game folder not found. Please check the path and try again.`, 2, true);
+      writeLog(`Game folder not found. Please check the path and try again.`, 1, true);
       return false;
    }
 
    if (!patch?.configSrcMap || typeof patch.configSrcMap !== 'object') {
-      writeLog(`${ncc('Red')}[error]${ncc()} 'patch.configSrcMap' is invalid or missing in patch.json`, 2, true);
+      writeLog(`'patch.configSrcMap' is invalid or missing in patch.json`, 1, true);
       return false;
    }
 
@@ -1956,20 +1955,20 @@ function verifyGamePath(gamePath) {
       const relPath = patch.configSrcMap[src].path;
 
       if (!relPath) {
-         writeLog(`${ncc(color.gold)}[warn]${ncc()} can't find path for "${src}"`, 3, true);
+         writeLog(`can't find path for "${src}"`, 2, true);
          continue;
       }
 
       const fullPath = path.resolve(gamePath, relPath);
       if (!fs.existsSync(fullPath)) {
-         writeLog(`${ncc(color.gold)}[warn]${ncc()} can't find file "${fullPath}"`, 3, true);
+         writeLog(`can't find file "${fullPath}"`, 2, true);
          continue;
       }
 
       try{
          fs.accessSync(fullPath, fs.constants.W_OK);
       }catch(e){
-         writeLog(`${ncc(color.gold)}[warn]${ncc()} can't write to file "${fullPath}", premission denied.`, 3, true);
+         writeLog(`can't write to file "${fullPath}", premission denied.`, 1, true);
          continue;
       }
       passCount++;
@@ -1977,12 +1976,12 @@ function verifyGamePath(gamePath) {
 
    if (!passCount) {
       writeLog(
-         `${ncc('Red')}[error]${ncc()} Can't find any files in the game folder. Please check the path and try again.`, 2, true
+         `Can't find any files in the game folder. Please check the path and try again.`, 1, true
       );
       return false;
    }
    else if (passCount < to.propertiesCount(patch.configSrcMap)) {
-      writeLog(`${ncc(color.gold)}[warn]${ncc()} Some file(s) are missing but we can work with the rest.`, 3, true);
+      writeLog(`Some file(s) are missing but we can work with the rest.`, 2, true);
       hasErrorOrWarning = true;
    }
 
@@ -1991,7 +1990,7 @@ function verifyGamePath(gamePath) {
 
 
 async function loadSettings() {
-   writeLog(`${ncc(color.mikuCyan)}[info]${ncc()} Loading settings...`, 3, true);
+   writeLog(`Loading settings...`, 3, true);
    settings.raw = new Map();
    settings.parsed = new Map();
    settings.allRawSettings = new Map();
@@ -2012,14 +2011,14 @@ async function loadSettings() {
             rawSettings = await handler.loadJSON(fullPath, patch.configSrcMap[src]);
             break;
          default:
-            writeLog(`${ncc(color.gold)}[warn]${ncc()} Invalid dataType "${patch.configSrcMap[src].type}" for "${src}"`, 3, true);
+            writeLog(`Invalid dataType "${patch.configSrcMap[src].type}" for "${src}"`, 2, true);
             hasErrorOrWarning = true;
             continue;
       }
 
       if (!rawSettings) {
-         writeLog(`${ncc(color.gold)}[warn]${ncc()} Failed to load "${src}" continue...`, 3, true);
-         writeLog('failed reason: `rawSetting` is null', 3);
+         writeLog(`Failed to load "${src}" continue...`, 2, true);
+         writeLog('failed reason: `rawSetting` is null', 2);
          hasErrorOrWarning = true;
          continue;
       }
@@ -2051,7 +2050,7 @@ async function loadSettings() {
       }),
    );
 
-   writeLog(`${ncc(color.mikuCyan)}[info]${ncc()} Loaded ${settings.parsed.size} settings from ${settings.allRawSettings.size} sources.`, 3, true);
+   writeLog(`Loaded ${settings.parsed.size} settings from ${settings.allRawSettings.size} sources.`, 3, true);
 
    return {
       settingTFIDF,
@@ -2100,13 +2099,13 @@ async function parseSettings() {
                );
                break;
             default:
-               writeLog(`${ncc(color.gold)}[warn]${ncc()} Invalid type "${patch.configSrcMap[src].type}" for "${src}"`, 3, true);
+               writeLog(`Invalid type "${patch.configSrcMap[src].type}" for "${src}"`, 2, true);
                continue;
          }
 
          if(!parsedValue){
-            writeLog(`${ncc(color.gold)}[warn]${ncc()} Failed to parse "${optName}" with type "${optionDataType}"`, 3, true);
-            writeLog('failed reason: `parsedValue` is null', 3);
+            writeLog(`Failed to parse "${optName}" with type "${optionDataType}"`, 2, true);
+            writeLog('failed reason: `parsedValue` is null', 2);
             continue;
          }
 
@@ -2159,8 +2158,8 @@ async function parseSettings() {
             );
             break;
          default:
-            writeLog(`${ncc(color.gold)}[warn]${ncc()} Invalid type "${srcConfig.dataType}" in \`allRawSettings\``, 3, true);
-            writeLog(`\`srcConfig\`: ${to.yuString(srcConfig)}`, 3);
+            writeLog(`Invalid type "${srcConfig.dataType}" in \`allRawSettings\``, 2, true);
+            writeLog(`\`srcConfig\`: ${to.yuString(srcConfig)}`, 2);
             continue;
       }
 
@@ -2211,13 +2210,13 @@ async function writeSettings(){
                await handler.writeKBTupleMap(fullPath, _settings, patch, settings.allRawSettings);
                break;
             default:
-               writeLog(`${ncc(color.gold)}[warn]${ncc()} Invalid dataType "${patch.configSrcMap[src].dataType}" for "${src}"`, 3);
+               writeLog(`Invalid dataType "${patch.configSrcMap[src].dataType}" for "${src}"`, 2);
                continue;
          }
       }
       catch(e){
-         writeLog(`${ncc('Red')}[error]${ncc()} Error writing to "${fullPath}"`, 2);
-         writeLog(`Error: ${to.yuString(e)}`, 2);
+         writeLog(`Error writing to "${fullPath}"`, 1);
+         writeLog(to.yuString(e), 1);
          return 2;
       }
    }
@@ -2243,18 +2242,15 @@ async function exitProgram(){
       if(choice == 0){
          const code = await writeSettings();
 
-         if(!code){
-            statusMsg[0] = 'Settings saved. changes will take effect after restarting the game';
-         }
-         else if(code == 1){
-            statusMsg[0] = ncc('Red') + `The Game is running, please close it and try again.` + ncc(color.gray9);
-            terminal.emit('resize');
-            return;
-         }
-         else if(code == 2){
-            statusMsg[0] = ncc('Red') + `Error while writing, see log for more info.` + ncc(color.gray9);
-            terminal.emit('resize');
-            return;
+         switch(code){
+            case 0:
+               return 'Settings saved. changes will take effect after restarting the game';
+            case 1:
+               terminal.emit('resize');
+               return ncc('Red') + `The Game is running, please close it and try again.` + ncc(color.gray9);
+            case 2:
+               terminal.emit('resize');
+               return ncc('Red') + `Error while writing, see log for more info.` + ncc(color.gray9);
          }
       }
    }
@@ -2277,13 +2273,13 @@ async function backupGameConfigSrc(){
       backupPath = await createBackup(filesNeedBackup);
    }
    catch(e){
-      writeLog(`${ncc('Red')}[error]${ncc()} error while creating backup: ${to.yuString(e)}`, 2, true);
+      writeLog(`error while creating backup: ${to.yuString(e)}`, 1, true);
       hasErrorOrWarning = true;
       return;
    }
 
    if(backupPath){
-      writeLog(`${ncc(color.mikuCyan)}[info]${ncc()} Created Backup to "${backupPath}"`, 3, true);
+      writeLog(`Created Backup to "${backupPath}"`, 3, true);
    }
 }
 
@@ -2342,26 +2338,33 @@ async function doStartupTask(){
       };
    }
 
+   isElevated = (await import('is-elevated')).default;
+
    if(_global.isThisProcessElevated === null){
       _global.isThisProcessElevated = await isElevated();
    }
 
    openLogFile();
 
-   writeLog(`WuWa Editor Starting...\nCurrent machine date is: ${new Date()}`, 3);
+   writeLog(`WuWa Editor Starting...\nCurrent machine date is: ${new Date()}`);
    loadPatch();
 }
 
-
+/**
+ * cleanup and exit the program
+ * @returns {never}
+ */
 function doShutdownTask(exitCode = 0){
    if(shuttingDown) return;
-   writeLog(`${ncc(color.mikuCyan)}[info]${ncc()} Shutting down...`, 3);
+   writeLog(`Shutting down...\n\n\n\n`);
 
    shuttingDown = true;
    closeLogFile();
 
-   terminal.clearScreen();
-   config.writeConfig();
+   if(exitCode == 0){
+      terminal.clearScreen();
+      config.writeConfig();
+   }
    terminal.close();
 
    process.exit(exitCode);

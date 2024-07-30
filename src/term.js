@@ -24,8 +24,6 @@ ${ncc(0x23dbd2)} │ ${strSurround('WuWa Editor', ' ', 40)}
 );
 
 
-terminal.close();
-
 
 
 module.exports = terminal;

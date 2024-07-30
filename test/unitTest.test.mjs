@@ -19,13 +19,9 @@ terminal.close();
 const { changeDateTimezone } = to;
 
 
-expect(isElevated(),
-   'Process not elevated! some test will failed if ran on non-elevated process'
-).to.be.true;
 
 
-
-describe('utilities.js', () => {
+describe('utilities.js', async () => {
    describe('#isProcessRunning()', () => {
       it('should return true if the process is running', async () => {
          switch(process.platform){
@@ -60,6 +56,10 @@ describe('utilities.js', () => {
          this.timeout(0);
          let testerNotified = false;
 
+         expect(await isElevated(),
+            'Process not elevated! This test will FAIL! if ran on non-elevated process'
+         ).to.be.true;
+
          switch(process.platform){
             case 'win32':
                while(!(await isProcessRunning('Taskmgr.exe'))){
@@ -73,7 +73,8 @@ describe('utilities.js', () => {
                   await to.asyncSleep(1000);
                }
 
-               console.log('Task Manager is running..., continue the test');
+               if(testerNotified)
+                  console.log('Task Manager is running..., continue the test');
                this.timeout(2000);
 
                const path = await getProcessPath('Taskmgr.exe');
@@ -142,7 +143,7 @@ describe('utilities.js', () => {
          expect(() => writeLog('anything', 3)).to.not.throw();
       });
 
-      it('should write the message to the log file', () => {
+      it('should write message to the log file', () => {
          _global.logFileWS = {
             write: (msg) => writtenMsg = msg
          };
@@ -154,21 +155,24 @@ describe('utilities.js', () => {
 
       it('should write correct debug level to the log file', () => {
          writeLog('anything', 4);
-         expect(writtenMsg).to.include('[DEBUG]');
+         expect(writtenMsg).to.include('[debug]');
 
          writeLog('anything', 3);
-         expect(writtenMsg).to.include('[INFO]');
+         expect(writtenMsg).to.include('[info]');
 
          writeLog('anything', 2);
-         expect(writtenMsg).to.include('[ERROR]');
+         expect(writtenMsg).to.include('[warn]');
 
          writeLog('anything', 1);
-         expect(writtenMsg).to.include('[CRITICAL]');
+         expect(writtenMsg).to.include('[error]');
+
+         writeLog('anything', 0);
+         expect(writtenMsg).to.include('[critical]');
       });
 
       it('should default to debug level 3 if no level is given', () => {
          writeLog('anything');
-         expect(writtenMsg).to.include('[INFO]');
+         expect(writtenMsg).to.include('[info]');
       });
 
       _global.logFileWS = null;
@@ -198,7 +202,7 @@ describe('backup.js', () => {
 
       it('should return null if the date is invalid', () => {
          expect(
-            resolveBackupTimestamp('BACKUP_2024-y7-21T25+14+36.709Z@1.0.0')
+            resolveBackupTimestamp('BACKUP_2024-y7-21T25+14+36.709Z@1.0.0') // shuld work w/o .zip
          ).to.be.null;
       });
    })

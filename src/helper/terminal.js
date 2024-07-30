@@ -231,8 +231,9 @@ module.exports = class Terminal {
     */
    initialize(headMsg = null){
       process.stdin.setRawMode(true);
+      process.stdin.resume();
       process.stdin.setEncoding('utf-8');
-      process.stdin.on('data', this.#handlesInput);
+      process.stdin.on('data', this.#handlesInput.bind(this));
 
       //initialize #lineMsg
       this.#lineMsg = '' + this.lineHead;
@@ -240,9 +241,13 @@ module.exports = class Terminal {
       else this.log('');
    }
 
+   /**
+    * close the Terminal and stop receiving inputs
+    * only use this when you are done with the Terminal and never going to use it again
+    */
    close(){
       process.stdin.setRawMode(false);
-      process.stdin.removeListener('data', this.#handlesInput);
+      process.stdin.removeListener('data', this.#handlesInput.bind(this));
       process.stdin.pause();
    }
 

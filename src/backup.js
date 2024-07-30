@@ -11,7 +11,7 @@ const { writeLog } = require('./utilities.js');
 
 /**
  * @param {string[]} filePaths
- * @returns {Promise<string>} backup file path
+ * @returns {Promise<string|null>} backup file path
  */
 async function createBackup(filePaths){
    return new Promise((resolve, reject) => {
@@ -22,9 +22,10 @@ async function createBackup(filePaths){
       const backedUpFiles = getBackupList();
 
       if(backedUpFiles.length > 0){
+         writeLog(`last backup: ${backedUpFiles[0]}`, 4);
          const lastBackup = resolveBackupTimestamp(backedUpFiles[0]);
          if(lastBackup && (new Date() - lastBackup) < 1000*60*15){
-            resolve(false); // if the last backup is less than 15 minutes ago
+            resolve(null); // if the last backup is less than 15 minutes ago
          }
       }
 
@@ -70,14 +71,15 @@ function getBackupList(){
    return fs.readdirSync(backupFolder, { withFileTypes: true })
       .filter(file => file.isFile()&&file.name.startsWith('BACKUP_'))
       .map(file => file.name)
-      .sort((a, b) => a - b); // file name is designed to be alphabetically sorted by date
+      .sort((a, b) => a - b) // file name is designed to be alphabetically sorted by date
+      .reverse(); // ^ changing this to b - a won't do anything apparently
 }
 
 
 /**
  * restore backup file
  * @param {string} filename
- * @returns {Promise<boolean>} whether the restore is successful
+ * @returns {Promise<boolean>} whether the restore was successful
  */
 async function restoreBackup(filename){
    const backupPath = path.join(backupFolder, filename);
@@ -116,17 +118,16 @@ async function restoreBackup(filename){
                }
 
                resolve(true);
-            }catch(err){
-               writeLog(`restore failed: failed to write file: ${err.stack}`, 2);
-               reject('write failed');
+            }
+            catch(err){
+               writeLog(`restore failed: failed to write file: ${err.stack}`, 1);
+               resolve(false);
             }
          });
       });
    }
    catch(err){
-      if(err.message === 'write failed') return false;
-
-      writeLog(`restore failed: preperation failed ${err.stack}`, 2);
+      writeLog(`restore failed: preperation failed ${err.stack}`, 1);
       return false;
    }
 }
@@ -172,7 +173,7 @@ function createBackupTemp(filePaths){
          { encoding: 'utf-8' }
       );
    }catch(err){
-      writeLog(err, 2);
+      writeLog(err, 1);
    }
 
    return filePaths;
