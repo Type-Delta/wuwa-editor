@@ -1,0 +1,12 @@
+
+# devolopment file/folders
+test/**/
+node_modules/
+build/
+backup/
+.vscode/
+package-lock.json
+
+# program's files
+config.conf
+*.log

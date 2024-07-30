@@ -1,0 +1,415 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema",
+   "type": "object",
+   "title": "WuWa Editor Patch.json schema",
+   "description": "Patch.json provides information for the editor to properly handle the Game's configuration files.",
+   "$defs": {
+      "$comment": "definitions for dynamic contents that changes as patch.json is updated (e.g. keys in configSrcMap)",
+      "ConfigSrcList": {
+         "type": "string",
+         "title": "Configuration Source (Friendly) Name",
+         "description": "A friendly name of the configuration source.\nthis name is used to reference the source of settings throughout the Editor\n\nthis list needs to be constantly updated with Keys of `configSrcMap` in `patch.json` \n\nPlease note that multiple Configuration Source can point to the same file, this is useful when the file contains multiple types of settings that required different handling method",
+         "enum": [
+            "userSettings",
+            "inputSettings",
+            "advanceSettings",
+            "combinedAction"
+         ]
+      },
+      "SettingSrcDataType": {
+         "type": "string",
+         "description": "type of this content inside the file (after the read process), defined how to parse it's content",
+         "enum": [
+            "JSON", "ini", "KBTupleMap"
+         ]
+      },
+      "SettingSrcFileType": {
+         "type": "string",
+         "description": "type of this file (e.g. encoding, format) (before parsing the file), defined how to read it\n\nCan be:\n- plainText: plain text file (UTF-8)\n- sqlite: SQLite3 database file",
+         "enum": [
+            "plainText", "sqlite"
+         ]
+      },
+      "OptionPatchOptionTypes": {
+         "type": "string",
+         "description": "type of the option (how the option should be displayed and edited in the editor)",
+         "enum": [
+            "number", "enum", "bool", "bindings", "axis"
+         ]
+      }
+   },
+   "definitions": {
+      "ConfigSrc": {
+         "type": "object",
+         "title": "## IMPORTANT NOTE: if this key is being complained that 'Value is not accepted', it is likely that this Source Name is not defined in the schema, please add it to the `$defs/ConfigSrcList` in 'patchSchema.json' ##\n\nConfiguration Source",
+         "description": "A friendly name of the configuration source.\nthis name is used to reference the source of settings throughout the Editor\n\nPlease note that multiple Configuration Source can point to the same file, this is useful when the file contains multiple types of settings that required different handling method",
+         "properties": {
+            "displayName": {
+               "type": "string",
+               "title": "Display Name",
+               "description": "A friendly name of the configuration file"
+            },
+            "description": {
+               "type": "string",
+               "title": "Description",
+               "description": "A description of the configuration file"
+            },
+            "path": {
+               "type": "string",
+               "title": "Path",
+               "description": "A RELATIVE path to the configuration file, this path is relative to the game's root directory (the root directory must contains game folder, for the current game version, root should contain a game folder named 'Wuthering Waves Game')\ne.g. './Wuthering Waves Game/Config/Settings.ini'",
+               "format": "uri-reference",
+               "pattern": "\\.[/\\\\]Wuthering Waves Game[\\\\/].+"
+            },
+            "dataType": {
+               "type": "string",
+               "title": "Data Type",
+               "$ref": "#/$defs/SettingSrcDataType"
+            },
+            "type": {
+               "type": "string",
+               "title": "Source-File Type",
+               "$ref": "#/$defs/SettingSrcFileType"
+            },
+            "manifest": {
+               "type": "object",
+               "$ref": "#/definitions/SettingSrcMetadataManifest"
+            },
+            "usedAsRaw": {
+               "type": "boolean",
+               "title": "Used as Raw",
+               "description": "whether the settings in this source file is used as raw data (we shouldn't parse this setting)\nif this setting is set to true, user can't see or directly edit the setting in the editor, but other source may refer use this source as raw data",
+               "default": false
+            },
+            "configurable": {
+               "type": "boolean",
+               "title": "Configurable",
+               "description": "whether the settings in this source file can be configure and modified DIRECTLY by the user (user can see and edit the setting in the editor)",
+               "default": true
+            }
+         },
+         "required": [
+            "description",
+            "path",
+            "dataType",
+            "type"
+         ]
+      },
+      "SettingSrcMetadataManifest": {
+         "title": "Manifest",
+         "description": "define how setting is parsed and grouped etc. in the source file",
+         "properties": {
+            "settingGroups": {
+               "type": "object",
+               "title": "Setting Groups",
+               "description": "explicitly define setting groups in the source file. group name as Key and predicate to match Game-Setting Keys belong to said group as a value (only takes effect when writting)\n\nOrder of the group is important, as the program will match from the first group to the last group\nthe matched key will never match twice (similar to if-else statement)\n\n predicate can be a key name for literal match (===) or predicate function as follow:\n - `$if:<statement>`: match if the JavaScript statement is true (available variable(s) is `key`)\n - `$regex:<pattern>`: match if the key match the regular expression pattern",
+               "additionalProperties": {
+                  "type":"array",
+                  "title": "Setting Group Predicate",
+                  "description": "list of predicate to match the setting key that would belong to this group (this key would be used as group name)\n\nNote: order is important, see 'settingGroups' description)",
+                  "items": {
+                     "type": "string",
+                     "anyOf": [
+                        {
+                           "title": "Predicate Match",
+                           "description": "Match if the predicate is true",
+                           "type": "string",
+                           "pattern": "^\\$if:"
+                        },
+                        {
+                           "title": "Regex Match",
+                           "description": "Match if the key match the regular expression pattern",
+                           "type": "string",
+                           "pattern": "^\\$regex:"
+                        },
+                        {
+                           "title": "Literal Match",
+                           "description": "Match if the key is equal to the value",
+                           "type": "string"
+                        }
+
+                     ]
+                  }
+               }
+
+            },
+            "selectedTable": {
+               "type": "string",
+               "title": "Selected Table",
+               "description": "database table name to use when reading the source file (only used when the source file is a database, this property is ignored otherwise)"
+            },
+            "includeSrc": {
+               "type": "array",
+               "title": "Included Sources File",
+               "description": "list of setting source file to include while parsing"
+            },
+            "acceptedGroups": {
+               "type": "array",
+               "title": "Accepted Groups",
+               "description": "white-list of setting groups to parse, if empty all groups will be parsed (takes effect when reading)\nthis group name is the name defined in the Game's settings files",
+               "items": {
+                  "type": "string",
+                  "title": "White-listed Group Name",
+                  "description": "setting groups that match this name will be parsed (along with other groups that are explicitly defined in 'settingGroups')"
+               }
+            },
+            "Reviver": {
+               "type": "string",
+               "description": "Reviver function to use when parsing settings (would be used instead of JSONReviver when parsing JSON type settings) this reviver works the same as the reviver parameter in JSON.parse()\n\n available values:\n\n - 'default': use default reviver\n - 'none': don't use any reviver (default)\n - `<$func>`: use custom reviver function defined with syntax `$func:<functionBody>` with two parameters `key`, `value` and `context` object (see [MDN Doc](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse#the_reviver_parameter))",
+               "anyOf": [
+                  {
+                     "title": "Reviver - Default Reviver",
+                     "const": "default"
+                  },
+                  {
+                     "title": "Reviver - No Reviver (default)",
+                     "const": "none"
+                  },
+                  {
+                     "title": "Reviver - Custom Reviver",
+                     "pattern": "^\\$func:"
+                  }
+               ]
+            },
+            "Replacer": {
+               "type": "string",
+               "description": "Replacer function to use when writing settings (would be used instead of JSONReplacer when stringify JSON type settings)\n\navailable values:\n - 'default': use default replacer\n - 'none': don't use any replacer (default)\n - `<$func>`: use custom replacer function defined with syntax `$func:<functionBody>` with two parameters `key` and `value` (see [MDN Doc](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse#the_reviver_parameter))",
+               "anyOf": [
+                  {
+                     "title": "Replacer - Default Replacer",
+                     "enum": [
+                        "default"
+                     ]
+                  },
+                  {
+                     "title": "Replacer - No Replacer (default)",
+                     "enum": [
+                        "none"
+                     ]
+                  },
+                  {
+                     "title": "Replacer - Custom Replacer",
+                     "pattern": "^\\$func:"
+                  }
+               ]
+            }
+         }
+      },
+      "OptionPatch": {
+         "type": "object",
+         "title": "Option Patch - setting attributes declaration",
+         "description": "declaration of how this setting should be handled (e.g. display, edit, etc.) in the editor",
+         "properties": {
+            "description": {
+               "type": "string",
+               "title": "Setting Description",
+               "description": "A description for this Setting, this description will be displayed in the editor"
+            },
+            "src": {
+               "type": "string",
+               "title": "Config Source Friendly Name",
+               "description": "key name of the config source file (reference in patch.json->`configSrcMap`) the setting is from",
+               "$ref": "#/$defs/ConfigSrcList"
+            },
+            "key": {
+               "type": "string",
+               "title": "Game's Setting Key",
+               "description": "key name of the setting in the config source file",
+               "minLength": 1
+            },
+            "type": {
+               "type": "string",
+               "title": "Setting Type",
+               "description": "setting value type (what type this setting should be parsed as)",
+               "$ref": "#/$defs/OptionPatchOptionTypes"
+            },
+            "values": {
+               "type": "array",
+               "title": "Enum Values",
+               "description": "enum values use only for setting with type 'enum' **(in patch.json this property is named `values`)**",
+               "minItems": 1
+            },
+            "range": {
+               "type": "array",
+               "title": "Number Range",
+               "description": "range of the ideal setting value (use only for setting with type 'number')\nthis property is an array of two numbers, the first number is the minimum value and the second number is the maximum value, any omitted value will be considered as infinite (e.g. [null, 0] means the value must be lessthan or equal to 0)\n\nNote that this property just a suggestion, the editor will not enforce this range",
+               "minItems": 1,
+               "maxItems": 2,
+               "items": {
+                  "type": ["number", "null"]
+               }
+            },
+            "editNote": {
+               "type": "string",
+               "title": "Edit Note",
+               "description": "message shown to user when editing the setting"
+            },
+            "valueDesc": {
+               "type": "object",
+               "title": "Enum Value Descriptions",
+               "description": "description of each value in the enum `key` for this object is the available enum values",
+               "additionalProperties": {
+                  "type": "string",
+                  "title": "Enum Value Description",
+                  "description": "description of this enum value"
+               }
+            },
+            "default": {
+               "title": "Default Value",
+               "description": "default value for this setting (if the setting is not found in the source file, this value will be used)"
+            },
+            "allowMultiple": {
+               "type": "boolean",
+               "title": "Allow Multiple",
+               "description": "whether this setting can have multiple values (use only for setting with type 'enum')",
+               "default": false
+            }
+         },
+         "required": [
+            "description",
+            "key",
+            "type",
+            "src"
+         ],
+         "allOf": [
+            {
+               "if": {
+               "properties": {
+                  "type": {
+                     "const": "enum"
+                  }
+               }
+               },
+               "then": {
+                  "required": [
+                     "values"
+                  ]
+               }
+            }
+         ]
+      }
+   },
+   "required": [
+      "gameVersion",
+      "patchVersion",
+      "handlerVersion",
+      "configSrcMap",
+      "options",
+      "bindingsDeclaration",
+      "axisDeclaration",
+      "bindingsDescription",
+      "controlTypeDescription",
+      "terminalKeysTranslation"
+   ],
+   "properties": {
+      "gameVersion": {
+         "type": "string",
+         "title": "Game Version",
+         "description": "The version of the game this patch is intended for.",
+         "pattern": "^(\\d+\\.\\d+\\.\\d+)$"
+      },
+      "patchVersion": {
+         "type": "integer",
+         "title": "Patch Version",
+         "description": "The version of this patch file"
+      },
+      "handlerVersion": {
+         "type": "integer",
+         "title": "Handler Version",
+         "description": "The version of the handler this patch is intended for"
+      },
+      "configSrcMap": {
+         "type": "object",
+         "title": "Configuration Source Map",
+         "description": "list of setting source file's metadata where each source will be referenced by the name defined in this object (multiple source can point to the same file)",
+         "propertyNames": {
+            "type": "string",
+            "$ref": "#/$defs/ConfigSrcList"
+         },
+         "additionalProperties": {
+            "$ref": "#/definitions/ConfigSrc"
+         }
+      },
+      "options": {
+         "type": "object",
+         "title": "Option Categories",
+         "description": "settings grouped by keys that will be displayed in the editor",
+         "additionalProperties": {
+            "type": "object",
+            "title": "Option Category",
+            "description": "Category name that will be displayed in the editor main menu as Categories",
+            "additionalProperties": {
+               "$ref": "#/definitions/OptionPatch"
+            }
+         }
+      },
+      "bindingsDeclaration": {
+         "type": "object",
+         "title": "Bindings Declaration",
+         "description": "declaration of binary type input (e.g. key press, mouse click)",
+         "additionalProperties": {
+            "type": "object",
+            "title": "Bindings for this Device Type",
+            "description": "Map of bindings for this device type",
+            "additionalProperties": {
+               "type": ["string", "array"],
+               "title": "Mapped Input name",
+               "description": "**Key** is the friendly name of the input (what this editor understand), **Value** is the game defined input name(s) that this friendly name is mapped to",
+               "items": {
+                  "title": "Game defined input name with alias",
+                  "type": "string"
+               }
+            }
+         }
+      },
+      "axisDeclaration": {
+         "type": "object",
+         "title": "Axis Declaration",
+         "description": "declaration of analog type input (e.g. mouse movement, joystick)",
+         "additionalProperties": {
+            "type": "object",
+            "title": "Axis bindings for this Device Type",
+            "description": "Map of bindings for this device type",
+            "additionalProperties": {
+               "type": ["string", "array"],
+               "title": "Mapped Input name",
+               "description": "**Key** is the friendly name of the input (what this editor understand), **Value** is the game defined input name(s) that this friendly name is mapped to",
+               "items": {
+                  "title": "Game defined input name with alias",
+                  "type": "string"
+               }
+            }
+         }
+      },
+      "bindingsDescription": {
+         "type": "object",
+         "title": "Bindings Description",
+         "description": "description of each input",
+         "additionalProperties": {
+            "type": "string",
+            "title": "Input Description",
+            "description": "description of this input\n\ninput is a structured as a dot separated values (<bindingType>.<deviceName>.<inputName>) for example: `axis.mouse.MouseX`"
+         }
+      },
+      "controlTypeDescription": {
+         "type": "object",
+         "title": "Control Types Description",
+         "description": "description of each Control type this includes bindings, axis and every device type for each binding types (bindings and axis)",
+         "additionalProperties": {
+            "type": "string",
+            "title": "Control type Description",
+            "description": "description of this input\n\ninput is a structured as a dot separated values (<bindingType>.<deviceName>) for example: `axis.mouse`"
+         }
+      },
+      "terminalKeysTranslation": {
+         "type": "object",
+         "title": "Terminal Keys Translation",
+         "description": "translation of keyboard key name defined by terminal.js to Editors friendly key name\n\nfor keyboard only",
+         "additionalProperties": {
+            "type": "string",
+            "title": "Terminal Key Translation",
+            "description": "translation of this terminal key to Editors friendly key name"
+         }
+      }
+   }
+}
