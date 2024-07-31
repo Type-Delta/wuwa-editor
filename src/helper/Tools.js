@@ -5250,7 +5250,7 @@ const Tools = {
          }
       }catch{}
 
-      return '[unknown]';
+      return '[unknown]'; // TODO: unable to parse some custom object like `sqlite3.Database`
    }
 }
 

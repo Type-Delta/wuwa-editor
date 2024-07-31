@@ -14,7 +14,7 @@ const { ncc } = require('../src/helper/Tools.js');
    }
 
    console.log(
-      ncc('Green') + `Starting build process...${ncc()} (this process only needs to be done once)\nDon\'t worry, if the build process fails, the program would still work (w/o auto path detection)`
+      ncc('Green') + `Starting build process...${ncc()} (this process only needs to be done once)\nDon\'t worry, if the build process fails, the program would still works.`
    );
 
    try {

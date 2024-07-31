@@ -10,3 +10,7 @@ package-lock.json
 # program's files
 config.conf
 *.log
+*.anchor
+*.lnk
+*.ini
+wuwa-editor.bat

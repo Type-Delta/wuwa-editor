@@ -2331,13 +2331,6 @@ ${ncc(color.mikuCyan)}...${ncc('Reset')}`
 
 
 async function doStartupTask(){
-    // check if the module is builded
-   if(!isModuleGetIPathExist()){
-      if(canBuildGetIPath()){
-         await execProms('npm run build');
-      };
-   }
-
    isElevated = (await import('is-elevated')).default;
 
    if(_global.isThisProcessElevated === null){

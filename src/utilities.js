@@ -40,25 +40,26 @@ async function getProcessPath(targetProcess) {
    let processPath = null;
    switch (process.platform) {
       case 'win32':
-         {  // at the moment this function failed the "tricky process" test
-            // const cmd = `wmic process where "name='${targetProcess}'" get ExecutablePath`;
-            // const { stdout } = await execProms(cmd);
-
-            // processPath = [
-            //    ...(stdout.trim().split('\n').slice(1))
-            // ][0]?.trim() || null;
-            if(!isModuleGetIPathExist()) return null;
-
-            const cmd = `build\\getIPath.exe`;
+         {  // this command will fail the "tricky process" test if not elevated
+            const cmd = `wmic process where "name='${targetProcess}'" get ExecutablePath`;
             const { stdout } = await execProms(cmd);
 
-            const lineWithTarget = stdout.split('\n').find(line => line.includes(targetProcess));
-            if(!lineWithTarget) return null;
+            processPath = [
+               ...(stdout.trim().split('\n').slice(1))
+            ][0]?.trim() || null;
 
-            // each line look like this: `PID: 22880, Path: C:\Windows\System32\Taskmgr.exe`
-            processPath = lineWithTarget.split(',').at(-1)
-               .split(':').at(-1)
-               .trim() || null;
+
+            // if(!isModuleGetIPathExist()) return null;
+            // const cmd = `build\\getIPath.exe`;
+            // const { stdout } = await execProms(cmd);
+
+            // const lineWithTarget = stdout.split('\n').find(line => line.includes(targetProcess));
+            // if(!lineWithTarget) return null;
+
+            // // each line look like this: `PID: 22880, Path: C:\Windows\System32\Taskmgr.exe`
+            // processPath = lineWithTarget.split(',').at(-1)
+            //    .split(':').at(-1)
+            //    .trim() || null;
             break;
          }
       default:

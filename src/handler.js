@@ -385,6 +385,7 @@ async function readSQLite(filePath, settingSrc){
             return null;
          }
 
+         // TODO: unable to parse some custom object like `sqlite3.Database`
          writeLog(`query result: ${to.yuString([...result])}`);
          rawSettings.push(result[0]);
       }

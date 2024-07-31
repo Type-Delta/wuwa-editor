@@ -74,13 +74,13 @@ describe('Tools.js', () => {
                options.noHeader = false;
             });
 
-            it('the header should contain currect dimensions of the array', () => {
+            it('the header should contains correct dimensions of the array', () => {
                result = to.arrToString(testArr, options);
                expect(result.split(': ')[0]).to.equal('Array(3,4,5,5)');
             });
 
             it('should resolve ArrayLike type and parse it correctly', () => {
-               expect(result.includes('Int32Array')).to.be.true;
+               expect(result).to.includes('Int32Array');
             });
 
             it('should resolve Function type and parse it correctly', () => {
