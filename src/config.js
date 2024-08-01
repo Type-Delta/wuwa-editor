@@ -1,38 +1,34 @@
 const { readFileSync, existsSync, writeFileSync } = require('fs');
-const { parseBool, parseConfig, writeConfig } = require('./helper/Tools.js');
+const { stringifyConfig, parseConfig, writeConfig } = require('./helper/Tools.js');
 
 
-const CONFIG_PATH = './config.conf';
+const CONFIG_PATH = './config.ini';
+const writeConfigOptions = {
+   ignoreList: ['loadConfig', 'writeConfig', 'logFilePath', 'backupFolder']
+};
 const DEFAULT_CONFIG = `
 ###################   wuwa-editor Configuration   ###################
 # each setting is defined by pair (key) = (value)
 
 # Game instalation path
 # this folder should contain GameFolder (e.g. "Wuthering Waves Game") and launcher.exe
-gameInstalledPath = 'C:\\Program Files\\Wuthering Waves'
-gameClientName = 'Client-Win64-Shipping.exe'
-
 `;
 
+
 class Config {
-   /// Log
-   /**control which message should be shown in the console
-    * debug: 4, normal: 3, error: 2, critical: 1
-    * @type {number}
-    */
-   // DEBUGLEVEL = 4;
    /**
     * @type {string}
     */
    gameInstalledPath = null;
    gameClientName = 'Client-Win64-Shipping.exe';
+   getInstalledFolderName = 'Wuthering Waves';
    patchJSONLocation = './patch.json';
    backupFolder = './backup';
-   maxBackup = 5;
-   doBackup = false;
+   maxBackup = 10;
+   doBackup = true;
 
    logFilePath = './wuwa-editor.log';
-   logFileMaxSize = 1024 * 1024 * 5; // 5MB
+   logFileMaxSizeMB =  5;
 
 
    constructor(){
@@ -43,7 +39,9 @@ class Config {
       let CONFIG;
       if(!existsSync(CONFIG_PATH)){
          try{
-            writeFileSync(CONFIG_PATH, DEFAULT_CONFIG, { encoding: 'utf-8' });
+            const strConfig = DEFAULT_CONFIG + stringifyConfig(this, writeConfigOptions);
+
+            writeFileSync(CONFIG_PATH, strConfig, { encoding: 'utf-8' });
          }catch{}
          return;
       }
@@ -59,17 +57,12 @@ class Config {
       if(CONFIG.gameClientName) this.gameClientName = CONFIG.gameClientName;
       if(CONFIG.patchJSONLocation) this.patchJSONLocation = CONFIG.patchJSONLocation;
       if(CONFIG.backupFolder) this.backupFolder = CONFIG.backupFolder;
-      if(CONFIG.maxBackup) this.maxBackup = parseInt(CONFIG.maxBackup);
-      if(CONFIG.doBackup) this.doBackup = parseBool(CONFIG.doBackup);
-
-      // System Settings
-      // if(CONFIG.DEBUGLEVEL) this.DEBUGLEVEL = parseInt(CONFIG.DEBUGLEVEL);
+      if(CONFIG.maxBackup != null) this.maxBackup = parseInt(CONFIG.maxBackup);
+      this.doBackup = CONFIG.doBackup;
    }
 
    writeConfig(){
-      writeConfig(this, CONFIG_PATH, {
-         ignoreList: ['loadConfig', 'writeConfig', 'DEBUGLEVEL', 'logFilePath']
-      });
+      writeConfig(this, CONFIG_PATH, writeConfigOptions);
    }
 }
 

@@ -10,7 +10,7 @@ const to = require('./helper/Tools.js');
 const terminal = require('./term.js');
 const { color } = require('./global.js');
 const { predicate, writeLog } = require('./utilities.js');
-const { gameInstalledPath } = require('./config.js');
+const config = require('./config.js');
 
 const { ncc } = to;
 
@@ -84,7 +84,7 @@ class KeyBind {
    set(newValue, typeRef){
       this.value = newValue;
 
-      this.type = this.#resolveType(typeRef);
+      this.type = [this.#resolveType(typeRef)];
    }
 
 
@@ -104,7 +104,10 @@ class KeyBind {
       if(!this.value) this.value = [];
 
       if(key instanceof Array) this.value.push(...key);
-      else this.value = key;
+      else {
+         if(this.value instanceof Array) this.value.push(key);
+         else this.value = [this.value, key];
+      }
    }
 
    /**
@@ -355,7 +358,7 @@ async function readSQLite(filePath, settingSrc){
    }
 
    if(filePath.startsWith('.'))
-      filePath = path.resolve(gameInstalledPath, filePath);
+      filePath = path.resolve(config.gameInstalledPath, filePath);
 
    /**
     * @type {sqlite3.Database}
@@ -627,7 +630,7 @@ async function writeSQLite(filePath, settingSrc, settings){
    }
 
    if(filePath.startsWith('.'))
-      filePath = path.resolve(gameInstalledPath, filePath);
+      filePath = path.resolve(config.gameInstalledPath, filePath);
 
    /**
     * Query:

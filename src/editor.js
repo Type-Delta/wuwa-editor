@@ -3,9 +3,7 @@ const path = require('path');
 const _ = require('lodash');
 let isElevated = null; // require('is-elevated')
 
-
 const to = require('./helper/Tools');
-
 const config = require('./config.js');
 const {
    getProcessPath,
@@ -14,21 +12,20 @@ const {
    openLogFile,
    closeLogFile,
    writeLog,
-   isModuleGetIPathExist,
-   canBuildGetIPath
+   resolveGameInstallPath,
 } = require('./utilities.js');
 const terminal = require('./term.js');
 const handler = require('./handler.js');
 const _global = require('./global.js');
-
-
-const { color } = _global;
 const {
    createBackup,
    getBackupList,
    resolveBackupTimestamp,
    restoreBackup,
 } = require('./backup.js');
+
+
+const { color } = _global;
 
 
 /**
@@ -261,15 +258,13 @@ process.on('beforeExit', doShutdownTask);
          terminal.log(`${ncc(color.mikuCyan)}[info]${ncc()} Game not found in process list.
 
 You can set the game installation folder manually or run the game (for auto detection).
-${ncc(color.mikuCyan)}Auto${ncc()} - Auto detect game folder ${(isModuleGetIPathExist()? '(recommended)':ncc('Red')+'[not available]'+ncc())}
+${ncc(color.mikuCyan)}Auto${ncc()} - Auto detect game folder (recommended)
 ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
 
 (Use ${ncc(color.mikuCyan)}← → (Arrow keys)${ncc('Reset')} or ${ncc(color.mikuCyan)}wasd${ncc('Reset')} to navigate, Enter to select)\n`);
-         const userChoices = isModuleGetIPathExist()? ['Auto', 'Manual']: ['Manual'];
-         const choice = await terminal.promptChoice(userChoices);
+         const choice = await terminal.promptChoice(['Auto', 'Manual']);
 
-
-         if (choice == userChoices.length - 1) {
+         if (choice == 1) {
             await promptForGamePath();
             break checkInstalledPath;
          }
@@ -278,25 +273,27 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
                `Waiting for you to run the game... ;) (${ncc(color.mikuCyan)}Ctrl+C${ncc('Reset')} to exit)`
             );
 
-            let dotCount = 1;
+            let dotCount = 0;
             while (true) {
-               const isRunning = await isProcessRunning(config.gameClientName);
-               if (isRunning) {
-                  terminal.clearLine();
-                  writeLog('Game process found! resolving path...', 3, true);
-                  break;
-               } else {
-                  terminal.write(ncc(color.mikuCyan) + ''.padEnd(dotCount, '.') + ncc(), true);
-                  if (dotCount < 3) dotCount++;
-                  else dotCount = 1;
+               if(dotCount == 0){
+                  const isRunning = await isProcessRunning(config.gameClientName);
+                  if (isRunning) {
+                     terminal.clearLine();
+                     writeLog('Game process found! resolving path...', 3, true);
+                     break;
+                  }
                }
+
+               terminal.write(ncc(color.mikuCyan) + ''.padEnd(dotCount, '.') + ncc(), true);
+               if (dotCount < 3) dotCount++;
+               else dotCount = 0;
                await to.asyncSleep(500);
             }
          }
       }
 
-      config.gameInstalledPath = await getProcessPath(config.gameClientName);
-      if(!config.gameInstalledPath){
+      const imagePath = await getProcessPath(config.gameClientName);
+      if(!imagePath){
          writeLog('Failed to resolve game path.', 2, true);
          terminal.log(`please enter the game folder manually.`);
 
@@ -304,6 +301,7 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
          break checkInstalledPath;
       }
 
+      config.gameInstalledPath = resolveGameInstallPath(imagePath);
       terminal.log(`found: ${ncc(color.mikuCyan) + config.gameInstalledPath + ncc()}`);
       writeLog(`Game path found: ${config.gameInstalledPath}`, 3);
    }
@@ -320,7 +318,7 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
 
    if(hasErrorOrWarning){
       await terminal.prompt(
-         `${ncc(color.red)}[warn]${ncc()} There are errors or warnings when loading, do you wish to continue? \nPress ${ncc(color.mikuCyan)}Enter${ncc()} to continue...`
+         `${ncc('Red')}[warn]${ncc()} There are errors or warnings when loading, do you wish to continue? \nPress ${ncc(color.mikuCyan)}Enter${ncc()} to continue...`
       );
    }
    else await to.asyncSleep(500);
@@ -657,7 +655,7 @@ function drawSettingEditor(
                   leftPanelItems = ['Binding', 'Axis', 'Set Scaling'];
                   hearderMsg = 'Choose control type';
                   rightPanelActive = false;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to save, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
+                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
                   break;
                case 3: // 3. select control type (keyboard, mouse, controller, modifier)
                   leftPanelItems = Object.keys(patch[trackers.bindingInputTypePatchName])
@@ -665,19 +663,19 @@ function drawSettingEditor(
 
                   hearderMsg = 'Choose input device type' + (setting.type == 'axis'? ' or modifier key': '');
                   rightPanelActive = false;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to save, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
+                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
                   break;
                case 4:  // 4. select control key/axis
                   leftPanelItems = Object.keys(patch[trackers.bindingInputTypePatchName][trackers.bindingDeviceTypePatchName]);
                   rightPanelActive = false;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to save, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+(trackers.bindingDeviceTypePatchName == 'keyboard'? ncc(color.mikuCyan)+'Ctrl+G'+ncc(color.gray9)+' record key, ': '')+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
+                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+(trackers.bindingDeviceTypePatchName == 'keyboard'? ncc(color.mikuCyan)+'Ctrl+G'+ncc(color.gray9)+' record key, ': '')+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
                   break;
 
                case 5:
                   leftPanelItems = [...settingsMap.keys()];
                   hearderMsg = 'Modify, add or remove bindings';
                   rightPanelActive = true;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to confirm,  '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, value default to ' + ncc(color.mikuCyan) + '100' + ncc(color.gray9);
+                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to confirm,  '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, value default to ' + ncc(color.mikuCyan) + '100%' + ncc(color.gray9);
                   break;
                case 6:  // 6. key input mode (enter key binding with key press) (only accessible in step 4 with keyboard device type)
                   leftPanelItems = Object.keys(patch[trackers.bindingInputTypePatchName][trackers.bindingDeviceTypePatchName]);
@@ -708,7 +706,7 @@ function drawSettingEditor(
                   case 4:
                      bindingDesc = patch.bindingsDescription[
                         // bindingInputTypePatchName can be either 'bindingsDeclaration' or 'axisDeclaration'
-                        // to get just 'bindings' or 'axis' we slice of the 'Declaration' part
+                        // to get just 'bindings' or 'axis' we slice off the 'Declaration' part
                         trackers.bindingInputTypePatchName.slice(0, trackers.bindingInputTypePatchName.indexOf('D')) + '.' +
                         trackers.bindingDeviceTypePatchName + '.' +
                         leftPanelItems[choiceIndex]
@@ -1010,8 +1008,18 @@ async function showSettings(group, settingsMap, settingTFIDF, settingSearchField
          if(mode == 1){ // search mode (after pressing Ctrl+F)
             preventDefault?.();
 
-            if(key == terminal.Keys.ESC||key == terminal.Keys.CTRL_F||key == terminal.Keys.ENTER){
+            if(key == terminal.Keys.ESC||key == terminal.Keys.ENTER){ // exit search mode but keep the filter
                mode = 0;
+               updateFooterStatusMsg();
+               drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
+               terminal.allowedInputs = false;
+               return;
+            }
+
+            if(key == terminal.Keys.CTRL_F){ // exit search mode and clear the filter
+               mode = 0;
+               searchQuery = '';
+               updateSearchFilter();
                updateFooterStatusMsg();
                drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
                terminal.allowedInputs = false;
@@ -1114,7 +1122,7 @@ async function showSettings(group, settingsMap, settingTFIDF, settingSearchField
 
       switch(mode){
          case 0:
-            footerMsg = ncc(color.mikuCyan)+' Ctrl+F'+ncc(color.gray9)+' search, '+ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' edit, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' apply settings, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'W S'+ncc(color.gray9)+' to move';
+            footerMsg = ncc(color.mikuCyan)+' Ctrl+F'+ncc(color.gray9)+' search, '+ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to edit, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'W S'+ncc(color.gray9)+' to move';
             break;
          case 1:
             if(query){
@@ -1125,7 +1133,7 @@ async function showSettings(group, settingsMap, settingTFIDF, settingSearchField
                   query = query.slice(0, cursorPos) + ncc(color.gray6, 'bg') + query.at(cursorPos) + ncc(color.gray3, 'bg') + (cursorPos + 1?query.slice(cursorPos + 1):'');
                }
             }
-            footerMsg = 'Type to search, ' + ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'Ctrl+F'+ncc(color.gray9)+' to exit search ';
+            footerMsg = ncc(color.aquaPink) + 'Type' + ncc(color.gray9)+' to search, ' + ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to exit search, '+ncc(color.mikuCyan)+'Ctrl+F'+ncc(color.gray9)+' to clear';
             break;
       }
 
@@ -1447,14 +1455,7 @@ async function showSettingEditMenu(settingsMap, settingIndex){
                            break;
                         }
 
-                        if((num < -1||num > 1)&&!forceApply){
-                           statusMsg[1] = ncc(color.gold) + `value out of range${ncc(color.gray9)}, press ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to apply anyways` + ncc(color.gray9);
-                           forceApply = true;
-                           break;
-                        }
-
                         newBinding.scale = num;
-                        forceApply = false;
                         KBEdit_gotoStep(2);
                         break;
                      }
@@ -1788,11 +1789,6 @@ async function showMainMenu(settingsMap, patch, settingTFIDF, settingSearchField
             itemWidth, itemHeight, colCount, rowCount
          });
       });
-
-      function clearListeners(){
-         terminal.removeListener('key', onKeyListener);
-         terminal.removeListener('resize', resizeListener);
-      }
    });
 
    function calMenuGridSize(){
@@ -1810,9 +1806,10 @@ async function showMainMenu(settingsMap, patch, settingTFIDF, settingSearchField
 async function showRestoreBackupMenu(){
    const backupFileNames = getBackupList();
 
-   const footerMsg = `${ncc(color.mikuCyan)}← → ↑ ↓${ncc(color.gray9)} to Move, ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to select`;
+   const footerMsg = `${ncc(color.mikuCyan)}← → ↑ ↓${ncc(color.gray9)} to Move, ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to ${ncc('Red')}restore selected${color.gray9},  `+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back';
    let selectedIndex = 0, statusMsg = ['', ''];
    let restoring = false;
+   let awitConfirm = false;
 
 
    drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
@@ -1837,26 +1834,46 @@ async function showRestoreBackupMenu(){
             drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
 
          }else if(key == terminal.Keys.ESC){
+            if(awitConfirm){
+               awitConfirm = false;
+               statusMsg[0] = '';
+               drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
+               return;
+            }
+
             terminal.removeListener('key', onKeyListener);
             terminal.removeListener('resize', resizeListener);
             return resolve();
 
          }else if(key == terminal.Keys.ENTER){
-            restoring = true;
-            statusMsg[0] = 'Restoring...';
-            restoreBackup(backupFileNames[selectedIndex]).then(success => {
-               restoring = false;
-
-               if(!success){
-                  statusMsg[1] = ncc('Red') + 'restore failed' + ncc(color.gray9);
-                  drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
-                  return;
+            doRestore: {
+               if(await isProcessRunning(config.gameClientName)){
+                  statusMsg[0] = ncc('Red') + 'The Game is running, please close it and try again.' + ncc(color.gray9);
+                  break doRestore;
                }
 
-               terminal.removeListener('key', onKeyListener);
-               terminal.removeListener('resize', resizeListener);
-               return resolve('Restore successful');
-            });
+               if(!awitConfirm){
+                  awitConfirm = true;
+                  statusMsg[0] = ncc('Red') + 'this action cannot be undone'+ncc(color.gray9)+', press Enter again to confirm';
+                  break doRestore;
+               }
+
+               restoring = true;
+               statusMsg[0] = 'Restoring...';
+               restoreBackup(backupFileNames[selectedIndex]).then(success => {
+                  restoring = false;
+
+                  if(!success){
+                     statusMsg[1] = ncc('Red') + 'restore failed' + ncc(color.gray9);
+                     drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
+                     return;
+                  }
+
+                  terminal.removeListener('key', onKeyListener);
+                  terminal.removeListener('resize', resizeListener);
+                  return resolve('Restore successful');
+               });
+            }
 
             drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
          }
@@ -2226,7 +2243,9 @@ async function writeSettings(){
 }
 
 
-
+/**
+ * a wrapper for doShutdownTask() to handle unsaved changes
+ */
 async function exitProgram(){
    if(changesBackup.size){
       const choice = await terminal.promptChoice(['Yes!', 'Discard & exit', 'I\'m not done yet'], {
@@ -2259,7 +2278,9 @@ async function exitProgram(){
 }
 
 
-
+/**
+ * backup the game config files
+ */
 async function backupGameConfigSrc(){
    let filesNeedBackup = [];
 
@@ -2284,6 +2305,9 @@ async function backupGameConfigSrc(){
 }
 
 
+/**
+ * prompt user for game install path
+ */
 async function promptForGamePath() {
    terminal.log(
       `Please enter game installation folder. (e.g. C:\\Wuthering Waves)
@@ -2307,7 +2331,7 @@ ${ncc(color.mikuCyan)}...${ncc('Reset')}`
       if(gPath.startsWith('"')&&gPath.endsWith('"'))
          gPath = gPath.slice(1, -1);
 
-      gPath =  path.normalize(gPath);
+      gPath = path.normalize(gPath);
       if(!fs.existsSync(gPath)){
          terminal.log(
             `${ncc('Red')}[error]${ncc()} Folder not found or path is invalid, please try again.`

@@ -2,6 +2,7 @@ const exec = require('child_process').exec;
 const execProms = require('util').promisify(exec);
 const fs = require('fs');
 const commandExists = require('command-exists');
+const path = require('path');
 
 const to = require('./helper/Tools.js');
 const _global = require('./global.js');
@@ -115,7 +116,7 @@ return value;`
  */
 function openLogFile() {
    const logFileTooLong = fs.existsSync(config.logFilePath)
-      && fs.statSync(config.logFilePath).size > config.logFileMaxSize;
+      && fs.statSync(config.logFilePath).size > config.logFileMaxSizeMB * 1024 * 1024;
 
    _global.logFileWS = fs.createWriteStream(config.logFilePath, {
       flags: logFileTooLong? 'w' : 'a'
@@ -176,6 +177,23 @@ function writeLog(message, level = 3, print = false) {
    _global.logFileWS.write(content);
 }
 
+/**
+ * get game installation folder from game executable (not the launcher) path
+ * @param {string} imagePath
+ */
+function resolveGameInstallPath(imagePath){
+   imagePath = path.normalize(imagePath);
+   const folders = imagePath.split(path.sep);
+
+   for(let i = folders.length - 1; i > 0; i--){
+      if(folders[i] === config.getInstalledFolderName){
+         return folders.slice(0, i + 1).join(path.sep);
+      }
+   }
+
+   return null;
+}
+
 
 function isModuleGetIPathExist() {
    if(_global.moduleGetIPathExist === null){
@@ -206,5 +224,6 @@ module.exports = {
    openLogFile,
    closeLogFile,
    isModuleGetIPathExist,
-   canBuildGetIPath
+   canBuildGetIPath,
+   resolveGameInstallPath
 }

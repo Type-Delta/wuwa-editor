@@ -236,7 +236,7 @@ module.exports = class Terminal {
       process.stdin.on('data', this.#handlesInput.bind(this));
 
       //initialize #lineMsg
-      this.#lineMsg = '' + this.lineHead;
+      this.#lineMsg = '' + (this.lineHead ?? '');
       if(headMsg) this.log(headMsg);
       else this.log('');
    }
@@ -306,7 +306,7 @@ module.exports = class Terminal {
          }
          this.prompting = true;
 
-         printChoices();
+         printChoices(true);
 
          const waitForInput = (key, preventDefault) => {
             if(key == km.ENTER){
@@ -337,14 +337,14 @@ module.exports = class Terminal {
          let choice = '|';
          for(let i = 0; i < choices.length; i++){
             if(i == selected) choice += `${ncc('BgWhite')+ncc('Black')} ${choices[i]} ${ncc('reset')}`;
-            else choice += `${ncc('Reset')} ${choices[i]}`;
+            else choice += `${ncc('Reset')} ${choices[i]} `;
 
             choice += '|';
          }
          return choice;
       }
 
-      function printChoices(){
+      function printChoices(firstPrint = false){
          if(display == 'full'){
             self.clearScreen();
             if(msg){
@@ -357,7 +357,7 @@ module.exports = class Terminal {
             });
          }
          else {
-            self.display(createChoices(selected), 'center', null);
+            self.write(createChoices(selected), !firstPrint);
          }
       }
    }
@@ -465,16 +465,17 @@ module.exports = class Terminal {
 
 
    /**write message on the user input
-    * @param {String}msg output text
+    * @param {string}msg output text
     * @param {Boolean}replace whether to replace the current line with `msg` or
     * append, default to `false`
     * @returns {string} the last line  of the written message
     */
    write(msg, replace = false){
+      if(!msg) msg = '';
       if(typeof msg !== 'string') msg = msg + '';
 
       if(replace){
-         this.#lineMsg = this.lineHead + (!msg? '':msg);
+         this.#lineMsg = this.lineHead + msg;
          this.refreshLine();
          this.#lineLength = ex_length(this.#lineMsg, this.redundancyLv);
          return;
@@ -795,7 +796,7 @@ module.exports = class Terminal {
          if(y + LIndex + 1 >= this.height) break;
       }
 
-      this.#lineMsg = eachLine[LIndex];
+      this.#lineMsg = eachLine[LIndex] ?? '';
    }
 
 
@@ -934,8 +935,8 @@ module.exports = class Terminal {
             this.reposCursor();
             if(!this.suggestions||this.#suspendSugg) return;
             this.#suggest();
-         return;// Enter a driver category Number to view or type 'exit' to exit:
-         case km.TAB: //  type alkajldkjwlkdjalwkjdlajdlwjdaklwdjlny: 44
+         return;
+         case km.TAB:
             if(!this.#lastSuggested){
                this.write(' ');
                return;

@@ -2,6 +2,7 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import isElevated from 'is-elevated';
+import path from 'path';
 
 import to from '../src/helper/Tools.js';
 import {
@@ -9,10 +10,12 @@ import {
    getProcessPath,
    predicate,
    createJSONReviver,
-   writeLog
+   writeLog,
+   resolveGameInstallPath
 } from '../src/utilities.js';
 import _global from '../src/global.js';
 import { resolveBackupTimestamp } from '../src/backup.js';
+import config from '../src/config.js';
 import terminal from '../src/term.js';
 terminal.close();
 
@@ -176,6 +179,50 @@ describe('utilities.js', async () => {
       });
 
       _global.logFileWS = null;
+   });
+
+   describe('#resolveGameInstallPath()', () => {
+      const correctPath = path.normalize('C:\\Program Files\\Wuthering Waves');
+      config.getInstalledFolderName = 'Wuthering Waves';
+      let result = null;
+
+      it('should resolve path w/o any error', () => {
+         expect(() =>
+            result = resolveGameInstallPath('C:\\Program Files\\Wuthering Waves\\Wuthering Waves Game\\bin\\something.exe')
+         ).to.not.throw();
+      });
+
+      it('should return a string', () => {
+         expect(result).to.be.a('string');
+      });
+
+      it('should return the correct path', () => {
+         expect(result).to.equal(correctPath);
+      });
+
+      it('should return the correct path even if the image path changes', () => {
+         expect(
+            resolveGameInstallPath('C:\\Program Files\\Wuthering Waves\\Wuthering Waves Game\\Wuthering Waves\\something.exe')
+         ).to.equal('C:\\Program Files\\Wuthering Waves\\Wuthering Waves Game\\Wuthering Waves');
+
+         expect(
+            resolveGameInstallPath('C:\\Program Files\\Wuthering Waves\\bbbb/client\\something.exe')
+         ).to.equal(correctPath);
+
+         expect(
+            resolveGameInstallPath('C:\\Program Files\\Wuthering Waves\\')
+         ).to.equal(correctPath);
+
+         expect(
+            resolveGameInstallPath('C:\\Program Files\\Wuthering Waves\\Wuthering Waves Game/something.exe')
+         ).to.equal(correctPath);
+      });
+
+      it('should return null if it can\'t find the correct folder', () => {
+         expect(
+            resolveGameInstallPath('\\Wuthering Waves Game\\bin\\something.exe')
+         ).to.be.null;
+      });
    });
 });
 

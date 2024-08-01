@@ -3346,6 +3346,7 @@ const Tools = {
     * @returns Boolean data type
     */
    parseBool(stringBool, strictMode = false){
+      if(typeof stringBool == 'boolean') return stringBool;
       stringBool = stringBool.toLowerCase();
       const boolRes = (stringBool == 'true'?true:false);
 
@@ -4163,8 +4164,8 @@ const Tools = {
 
       function write(key, valueObj, group){
          let strValue = '';
-         if(typeof valueObj[key] == 'object')
-            strValue = `${JSON.stringify(valueObj[key], replacer, minify?null:3)};\n`;
+         if(valueObj[key] != null&&typeof valueObj[key] == 'object')
+            strValue = `${JSON.stringify(valueObj[key], replacer, minify?null:3)}\n`;
          else{
             if(typeof valueObj[key] == 'string'){
                if(alwaysWrapStrInQuotes||/\s|[\{\[\}\]]/.test(valueObj[key]))

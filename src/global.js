@@ -10,7 +10,7 @@ module.exports = {
       grayB: 0xbbbbbb,
       grayE: 0xeeeeee,
       mikuCyan: 0x23dbd2,
-      aquaPink: 0xc423bc,
+      aquaPink: 0xd149b1,
       gold: 0xc19c00
    }),
    version: '1.0.0',

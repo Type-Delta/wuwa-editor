@@ -8,9 +8,9 @@ backup/
 package-lock.json
 
 # program's files
-config.conf
+config.ini
 *.log
-*.anchor
+anchor.*
 *.lnk
 *.ini
 wuwa-editor.bat
