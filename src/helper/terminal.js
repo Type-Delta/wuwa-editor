@@ -1,8 +1,11 @@
 /**interactive terminal
  * @version: 1.2.5
+ * @module Terminal
+ * @requires module:Tools
  */
 
 // handle interactive CMD terminal
+// @ts-expect-error
 if(typeof Bun !== 'undefined')
    process.emitWarning('Arrow keys are not supported when using Bun, use Node.js for better compatibility');
 
@@ -15,6 +18,9 @@ const {
    strSlice,
    asyncSleep,
 } = require('./Tools.js');
+
+
+
 
 const km = {
    BACKSPACE: '\u0008',
@@ -58,20 +64,6 @@ const km = {
    isArrow: (key) => key[0] == '\u001b' && key[1] == '[' && 'ABCD'.includes(key[2]),
 };
 
-
-//"extension" function of Object `Number` that returns length of digits of Number
-Number.prototype.length = function length(){
-   return (this+'').replace(/[.e]/ig, '').length;
-};
-
-/**remove duplicated elements for the Array
- * @returns array without duplicate element
- */
-Array.prototype.removeDup = function removeDup(){
-   return to.cleanArr([...(new Set(this))]);
-}
-
-String.prototype.redexOf = redexOf;
 
 
 class Events {
@@ -134,6 +126,7 @@ module.exports = class Terminal {
    /**word suggestion and auto complete,
     * this is a list that will be suggested to the users
     * @var String Array: suggestions
+    * @type {string[]|null}
     */
    suggestions = null;
    /**the Code Numbers that would be returned by `Terminal.on('code')`
@@ -190,9 +183,9 @@ module.exports = class Terminal {
    /**Interactive console mainly focus on being
     * an input terminal that can receive keystroke
     * @package **require:** *nodeext.js, keyMap.js, Tools.js*
-    * @param {string[]}suggestion word suggestion and auto complete,
+    * @param {string[]|null}suggestion word suggestion and auto complete,
     * this is a list that will be suggested to the users
-    * @param {string}lineHead custom input marker
+    * @param {string|null}lineHead custom input marker
     * @param {boolean}ctrl_C_Kill if false **using ctrl+C WILL NOT kill the process!!**
     * usefull for application that needs to do something before shutdown.
     * @example
@@ -227,7 +220,7 @@ module.exports = class Terminal {
 
 
    /**start the Terminal and allowing inputs
-    * @param {String}headMsg text display on the top after initialized
+    * @param {string|null}headMsg text display on the top after initialized
     */
    initialize(headMsg = null){
       process.stdin.setRawMode(true);
@@ -252,7 +245,7 @@ module.exports = class Terminal {
    }
 
    /**write message to the terminal and wait for user inputs
-    * @param {string}msg
+    * @param {string|null}msg
     * @returns {Promise<string>}
     */
    prompt(msg = null, enableSuggestion = false){
@@ -282,9 +275,9 @@ module.exports = class Terminal {
 
    /**
     * @typedef {Object} PromptChoiceOptions
-    * @property {number|undefined}defaultChoice default choice index
-    * @property {string|undefined} msg message to be display before the choices
-    * @property {'inline'|'full'|undefined} display choices display style;
+    * @property {number|null} [defaultChoice] default choice index
+    * @property {string|null} [msg] message to be display before the choices
+    * @property {'inline'|'full'|null} [display] choices display style;
     * inline: tries to fit all choices in one line (this style can not be used with `msg`),
     * block: each choice in a new line,
     * full: wipe the screen and display choices in the center
@@ -295,8 +288,8 @@ module.exports = class Terminal {
     * @returns {Promise<number>}
     */
    promptChoice(choices, options = {}){
-      const { defaultChoice = 0, msg, display = 'inline' } = options;
-      let selected = defaultChoice;
+      const { defaultChoice, msg, display = 'inline' } = options;
+      let selected = defaultChoice ?? 0;
       const self = this;
 
       return new Promise((resolve, reject) => {
@@ -336,7 +329,7 @@ module.exports = class Terminal {
       function createChoices(selected){
          let choice = '|';
          for(let i = 0; i < choices.length; i++){
-            if(i == selected) choice += `${ncc('BgWhite')+ncc('Black')} ${choices[i]} ${ncc('reset')}`;
+            if(i == selected) choice += `${ncc('BgWhite')+ncc('Black')} ${choices[i]} ${ncc('Reset')}`;
             else choice += `${ncc('Reset')} ${choices[i]} `;
 
             choice += '|';
@@ -478,7 +471,7 @@ module.exports = class Terminal {
          this.#lineMsg = this.lineHead + msg;
          this.refreshLine();
          this.#lineLength = ex_length(this.#lineMsg, this.redundancyLv);
-         return;
+         return this.#lineMsg;
       }
       else if(msg.includes('\n')){
          const lastNLIndex = cleanString(msg).lastIndexOf('\n');
@@ -522,9 +515,9 @@ module.exports = class Terminal {
    }
 
    /**change or create new Ribbon
-    * @param {string|(ribbonText: string)=>string}modifier string or Callback with old ribbon text
+    * @param {string|((ribbonText: string)=>string)}modifier string or Callback with old ribbon text
     * passed in as argument, expected to return string which will be use as new ribbon text
-    * @param {string}bgColor `Tools.ncc()`'s color tag
+    * @param {string|number?}bgColor `Tools.ncc()`'s color tag
     */
    modifyRibbon(modifier, bgColor = null){
       if(typeof modifier == 'function'){
@@ -559,7 +552,7 @@ module.exports = class Terminal {
    /**clear the current line and move cursor (caret) to the correct position
     */
    clearLine(){
-      process.stdout.clearLine();
+      process.stdout.clearLine(0);
       this.cursorTo(0);
       delete this.#content[this.#cursorPos[1]];
       this.#cursorPos[0] = 0;
@@ -585,7 +578,7 @@ module.exports = class Terminal {
     * - `key`: when user press any key
     * - `resize`: when terminal window is resized
     * @param {'code'|'inputs'|'key'|'resize'}eventName eventName
-    * @param {function}callback function to be called when event emits
+    * @param {() => void} callback function to be called when event emits
     */
    on(eventName, callback){
       const eventNameIsValid = (
@@ -632,13 +625,13 @@ module.exports = class Terminal {
     *
     * position number can be **negative**
     * @param {number|'center'|'left'|'right'} x
-    * @param {number|'center'|'top'|'bottom'} [y=undefined]
+    * @param {number|'center'|'top'|'bottom'?} [y]
     * @param {boolean} [usePadding=false] whether to set the x position by padding with SPACE,
     * this is usefull for writing message in the middle of the screen
     *
     * **Note that: this will overwrite anything before the setted x-position.**
     */
-   cursorTo(x, y = undefined, usePadding = false){
+   cursorTo(x, y = null, usePadding = false){
       if(typeof x == 'string'){
          switch(x){
             case 'center':
@@ -666,7 +659,8 @@ module.exports = class Terminal {
       }
 
       if(x < 0) x = this.width + x;
-      if(y !== undefined&&y < 0) y = this.height + y;
+      if(y != null&&y < 0) y = this.height + y; // for negative position of y
+      if(y == null) y = this.#cursorPos[1];
 
       if(usePadding){
          // process.stdout.cursorTo(0, y);
@@ -680,7 +674,7 @@ module.exports = class Terminal {
          }
       }
 
-      process.stdout.cursorTo(x, y);
+      process.stdout.cursorTo(x, y ?? undefined);
       if(x) this.#cursorPos[0] = x;
       if(y) this.#cursorPos[1] = y;
    }
@@ -691,20 +685,30 @@ module.exports = class Terminal {
     * @param {string}msg
     * @param {number|'center'|'left'|'right'} [x=undefined]
     * @param {number|'center'|'top'|'bottom'} [y=undefined]
-    * @param {{effect: 'typed'|undefined,delay: number,length: number,keepLine: boolean,offset: number[]}} [option=undefined]
+    * @param {TerminalDisplayOptions} [option=undefined]
     * @returns {string|undefined} message that was written
+    */
+   /**
+    * @typedef {object} TerminalDisplayOptions
+    * @property {'typed'|undefined} [effect]
+    * @property {number|undefined} [delay]
+    * @property {number|undefined} [length]
+    * @property {boolean|undefined} [keepLine]
+    * @property {number[]|undefined|null} [offset]
+    * @property {CustomWriteCallback|undefined} [writeFunction]
     */
    /**write message at any given position on the screen
     *
     * this function treat terminal as if it where a literal display
-    * @param {string}msg
+    * @param {string|string[]} msg
     * @param {number|'center'|'left'|'right'} [x=undefined]
     * @param {number|'center'|'top'|'bottom'} [y=undefined]
-    * @param {{effect: 'typed'|undefined,delay: number,length: number,keepLine: boolean,offset: number[],writeFunction: CustomWriteCallback}} [options=undefined]
+    * @param {TerminalDisplayOptions} [options=undefined]
     * @returns {Promise<void>}
     */
-   async display(msg, x, y, options){
-      let eachLine = msg.split('\n');
+   async display(msg, x, y, options = {}){
+      let eachLine = typeof msg == 'string'? msg.split('\n'): msg;
+      const lineCount = eachLine.length;
       const msgContentWidth = options?.length
          ? options.length
          : eachLine.reduce((prev, curr) => { // get length of the longest line
@@ -745,20 +749,22 @@ module.exports = class Terminal {
       if(typeof y == 'string'){
          switch(y){
             case 'center':
-               y = (this.height >> 1);
-               if(eachLine.length > 1) y -= (eachLine.length >> 1);
+               y = Math.ceil(this.height / 2);
+               if(lineCount > 1) y -= Math.ceil(lineCount / 2);
                break;
             case 'top':
                y = 0;
                break;
             case 'bottom':
                y = this.height - 1;
-               if(eachLine.length > 1) y -= eachLine.length - 1;
+               if(lineCount > 1) y -= lineCount - 1;
                break;
             default:
-               y = undefined;
+               y = this.#cursorPos[1];
          }
       }
+
+      if(y == null) y = this.#cursorPos[1];
 
       if(options?.offset?.length){
          if(options.offset[0]) x += options.offset[0];
@@ -766,10 +772,9 @@ module.exports = class Terminal {
       }
 
 
-
       let LIndex = 0;
-      for(; LIndex < eachLine.length; LIndex++){
-         const line = eachLine[LIndex];
+      for(; LIndex < lineCount; LIndex++){
+         let line = eachLine[LIndex];
 
          if(options?.keepLine){
             this.cursorTo(x, y + LIndex, true);
@@ -812,7 +817,8 @@ module.exports = class Terminal {
          const readFx = function () {
             const buf = process.stdin.read();
             const str = JSON.stringify(buf); // "\u001b[9;1R"
-            const xy = (/\[(.*)/g).exec(str)[0].replace(/\[|R"/g, '').split(';');
+            const groups = (/\[(.*)/g).exec(str);
+            const xy = groups? groups[0].replace(/\[|R"/g, '').split(';'): [];
             resolve({ x: parseInt(xy[0]), y: parseInt(xy[1]) });
          }
 
@@ -838,7 +844,7 @@ module.exports = class Terminal {
     * - `key`: when user press any key
     * - `resize`: when terminal window is resized
     * @param {'code'|'inputs'|'key'|'resize'}eventName
-    * @param {function}callback callback function that was passed in to `Terminal.on()`
+    * @param {() => void}callback callback function that was passed in to `Terminal.on()`
     */
    removeListener(eventName, callback){
       const eventNameIsValid = (
@@ -868,9 +874,10 @@ module.exports = class Terminal {
       for(let i = this.#floats.length; i > 0; i--){
          const f = this.#floats[i - 1];
          process.stdout.cursorTo(0);
+         const bgStyle = f.bgColor? typeof f.bgColor == 'number'? ncc(f.bgColor, 'bg'):ncc(f.bgColor):'';
 
-         let ribbon = `${ncc(f.bgColor) + ncc(f.foreColor)}  ${f.text}  `;
-         ribbon = ribbon.padEnd(process.stdout.columns, ' ') + ncc('reset');
+         let ribbon = `${bgStyle + ncc(f.foreColor)}  ${f.text}  `;
+         ribbon = ribbon.padEnd(process.stdout.columns, ' ') + ncc('Reset');
          console.log(ribbon);
       }
 
@@ -882,7 +889,7 @@ module.exports = class Terminal {
    #clearScreenElements(){
       for(let i = 0; i < this.#floats.length + 1; i++){
          process.stdout.cursorTo(0, (process.stdout.rows - i) - 1);
-         process.stdout.clearLine();
+         process.stdout.clearLine(0);
       }
    }
 
@@ -925,7 +932,7 @@ module.exports = class Terminal {
          case km.BACKSPACE:
             if(this.#lineLength <= this.#lHeadLength + this.#linePromptLength) return;
 
-            process.stdout.clearLine();
+            process.stdout.clearLine(0);
             process.stdout.cursorTo(0);
 
             const lineDelBy1 = this.#lineMsg.slice(0, this.#lineLength-1);
@@ -945,7 +952,7 @@ module.exports = class Terminal {
             this.write(this.#lastSuggested);
          return;
          case km.CTRL_BACKSPACE:
-            this.write(null, true);
+
          return;
          default:
             // this.log(this.#cursorPos, this.#lineLength, this.#linePromptLength, this.#lHeadLength);
@@ -988,7 +995,7 @@ module.exports = class Terminal {
 
       const writingMsg = this.#getContent();
       //console.log(writingMsg.length);
-      const suggestions = search(this.suggestions, writingMsg, 3);
+      const suggestions = search(this.suggestions, writingMsg, { maxResult: 3 });
       if(!suggestions) return;
 
       for(let i = 0; i < suggestions.length; i++){
@@ -1055,9 +1062,15 @@ module.exports = class Terminal {
  * by any Terminal's Log message (like its floating on top of everything)
  */
 class Floating {
+   /**
+    * @type {string|number}
+    */
    bgColor = 'bgwhite';
    foreColor = 'black';
    text = '';
+   /**
+    * @param {string|number?} [bgColor=null] `Tools.ncc()`'s color tag
+    */
    constructor(text = '', bgColor = null){
       this.text = text;
       if(bgColor) this.bgColor = bgColor;

@@ -1,6 +1,7 @@
 const exec = require('child_process').exec;
 const execProms = require('util').promisify(exec);
 const fs = require('fs');
+// @ts-expect-error can't find module
 const commandExists = require('command-exists');
 const path = require('path');
 
@@ -99,11 +100,13 @@ function predicate(predicateStr, value) {
 /**
  * Create a JSON reviver/replacer function from a string
  * @param {string} functionBody
+ * @returns {((key: string, value: any) => any)}
  */
 function createJSONReviver(functionBody = '') {
    if(functionBody.startsWith('$func:'))
       functionBody = functionBody.slice(6);
 
+   // @ts-expect-error type mismatch
    return new Function(
       'key, value',
       `${functionBody};

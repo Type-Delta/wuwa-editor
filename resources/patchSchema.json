@@ -34,7 +34,7 @@
          "type": "string",
          "description": "type of the option (how the option should be displayed and edited in the editor)",
          "enum": [
-            "number", "enum", "bool", "bindings", "axis"
+            "number", "enum", "bool", "bindings", "axis", "string"
          ]
       }
    },
@@ -263,26 +263,53 @@
                "title": "Allow Multiple",
                "description": "whether this setting can have multiple values (use only for setting with type 'enum')",
                "default": false
+            },
+            "editable": {
+               "type": "boolean",
+               "title": "Editable",
+               "description": "whether user can edit this setting",
+               "default": true
             }
          },
-         "required": [
-            "description",
-            "key",
-            "type",
-            "src"
-         ],
+
          "allOf": [
             {
                "if": {
-               "properties": {
-                  "type": {
-                     "const": "enum"
+                  "properties": {
+                     "type": {
+                        "const": "enum"
+                     },
+                     "editable": {
+                        "const": true
+                     }
                   }
-               }
                },
                "then": {
                   "required": [
                      "values"
+                  ]
+               }
+            },
+            {
+               "if": {
+                  "properties": {
+                     "editable": {
+                        "const": true
+                     }
+                  }
+               },
+               "then": {
+                  "required": [
+                     "description",
+                     "key",
+                     "type",
+                     "src"
+                  ]
+               },
+               "else": {
+                  "required": [
+                     "key",
+                     "src"
                   ]
                }
             }

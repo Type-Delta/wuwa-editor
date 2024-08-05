@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+// @ts-expect-error can't find module
 const _ = require('lodash');
 let isElevated = null; // require('is-elevated')
 
@@ -29,7 +30,7 @@ const { color } = _global;
 
 
 /**
- * @import {KeyBind, AxisBind} from './handler.js
+ * @import {KeyBind, AxisBind} from './handler.js'
  */
 
 /**
@@ -57,7 +58,7 @@ const { color } = _global;
  */
 
 /**
- * @typedef {'enum'|'bool'|'number'|'bindings'|'axis'} OptionPatchOptionTypes type of the setting value after parsing
+ * @typedef {'enum'|'bool'|'number'|'bindings'|'axis'|'string'} OptionPatchOptionTypes type of the setting value after parsing
  */
 
 /**
@@ -92,7 +93,7 @@ const { color } = _global;
  * @property {string?} description setting description
  * @property {string} key key name of the setting in the config source file
  * @property {OptionPatchOptionTypes|undefined} type setting value type (what type this setting should be parsed as)
- * @property {'graphics'|'bindings'|'[Uncategorized]'} catergory setting group name
+ * @property {'graphics'|'bindings'|'[Uncategorized]'|string} catergory setting group name
  * @property {string[]?} eValues enum values use only for setting with type 'enum' **(in patch.json this property is named `values`)**
  * @property {[number|undefined|null, number|undefined]?} range range of the ideal setting value **(in patch.json this property is named `range`)**
  * @property {string?} editNote note shown when editing the setting
@@ -100,6 +101,7 @@ const { color } = _global;
  * @property {any?} default default value for the setting
  * @property {boolean} modified setting value has been modified
  * @property {string} group setting group name in the src file (this name identifies what group the setting should be written back to)
+ * @property {boolean} editable whether user can edit this setting
 */
 
 /**
@@ -121,14 +123,14 @@ const { color } = _global;
  * @property {string|undefined} rootProperty name of property that will be treated as root object for the setting (points to the setting object)
  * @property {string[]|undefined} acceptedGroups whitelist of setting groups to parse, if empty all groups will be parsed
  * @property {string[]|undefined} includeSrc list of setting source file to include while parsing
- * @property {string|'default'|'none'|(key: string, value: any, context: {source: any}) => any|undefined} Reviver function to use when parsing settings (would be used instead of JSONReviver when parsing JSON type settings)
+ * @property {string|'default'|'none'|((key: string, value: any, context: {source: any}) => any)|undefined} Reviver function to use when parsing settings (would be used instead of JSONReviver when parsing JSON type settings)
  *  this reviver works the same as the reviver parameter in JSON.parse()
  *
  * available values:
  * - 'default': use default reviver
  * - 'none': don't use any reviver (default)
  * - `<$func>`: use custom reviver function defined with syntax `$func:<functionBody>` with two parameters `key`, `value` and `context` object (see [MDN Doc](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse#the_reviver_parameter))
- * @property {string|'default'|'none'|(key: string, value: any) => any|undefined} Replacer function to use when writing settings (would be used instead of JSONReplacer when stringify JSON type settings)
+ * @property {string|'default'|'none'|((key: string, value: any) => any)|undefined} Replacer function to use when writing settings (would be used instead of JSONReplacer when stringify JSON type settings)
  *
  * available values:
  * - 'default': use default replacer
@@ -165,6 +167,7 @@ const { color } = _global;
  * @property {{[key: string]: string}?} valueDesc description of each value in the enum `key` for this object is the available enum values
  * @property {any?} default default value for this setting (if the setting is not found in the source file, this value will be used)
  * @property {boolean?} allowMultiple allow multiple values for this setting (default: false)
+ * @property {boolean?} editable whether user can edit this setting (default: true)
  */
 
 
@@ -323,6 +326,7 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
    }
    else await to.asyncSleep(500);
 
+   hasErrorOrWarning = false;
    writeLog('Loading UI...', 3, true);
 
 
@@ -435,7 +439,7 @@ function writeUI_splitScreen(
 /**
  * @param {string} category settings declared in patch.json (not to be confused with group setting)
  * @param {ParsedGameSettings} settingsMap settingsMap map of parsed settings
- * @param {number} settingIndex index of selected setting in settingsMap
+ * @param {number} selectedIndex index of selected setting in settingsMap
  * @param {string} footerMsg message to display at the 2nd row from the bottom
  * @param {string[]} statusMsg messages to display at the bottom row (each for left and right side)
  */
@@ -471,15 +475,14 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
                ? '\n  ' + setting.value.map(v => v.toString()).join('\n  ')
                : ncc(color.gray6)+'[empty]';
          else{
-            switch(setting.type){
-               case 'bool':
+            switch(typeof setting.value){
+               case 'boolean':
                   sValue = ncc(setting.value?'Green':'Red') + setting.value;
                   break;
-               case 'enum':
-                  sValue = ncc(color.gold) + setting.eValues[setting.value];
-                  break;
                case 'number':
-                  sValue = ncc(color.aquaPink) + setting.value;
+                  if(setting.type == 'enum')
+                     sValue = ncc(color.gold) + setting.eValues[setting.value];
+                  else sValue = ncc(color.aquaPink) + setting.value;
                   break;
                default:
                case 'string':
@@ -490,7 +493,8 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
          selDesc = ncc(color.grayB)+ncc('Bright')+ key + ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7) + '\n\n' + (setting.description ?? '[No Description provided]') +
             `\n\nType: ${(setting.type? ncc(color.mikuCyan)+setting.type:ncc('Red')+'Unknown')+ncc(color.gray7)}`+
             `\nValue: ` + sValue + ncc(color.gray7) +
-            '\nKey: ' + ncc(color.gray5) + setting.key + ncc(color.gray7);
+            '\nKey: ' + ncc(color.gray5) + setting.key + ncc(color.gray7) +
+            (patch.configSrcMap[setting.src]?.path? '\nSrc: ' + ncc(color.gray5) + to.strLimit(patch.configSrcMap[setting.src].path, terminalHalfW - 9, 'start') + ncc(color.gray7): '');
 
 
          disp.push(
@@ -542,15 +546,14 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
  * 4. select binding key/axis
  * 5. set axis scaling (this step can only be reached if select "set scaling" in step 2)
  * 6. key input mode (enter key binding with key press) (only accessible in step 4 with keyboard device type)
- * @property {'bindingsDeclaration'|'axisDeclaration'} bindingInputTypePatchName a key name in patch.json->`bindingsDeclaration` or `axisDeclaration`
+ * @property {'bindingsDeclaration'|'axisDeclaration'} [bindingInputTypePatchName] a key name in patch.json->`bindingsDeclaration` or `axisDeclaration`
  * @property {number} [selBindingIndex=0] current selected binding index, for **Bindings** and **Axis** type setting
- * @property {'mouse'|'controller'|'keyboard'|'modifiers'} bindingDeviceTypePatchName a key name in patch.json for the current selected input type
+ * @property {'mouse'|'controller'|'keyboard'|'modifiers'} [bindingDeviceTypePatchName] a key name in patch.json for the current selected input type
  *
  */
 /**
  * @param {ParsedGameSettings} settingsMap map of parsed settings
  * @param {number} settingIndex index of selected setting in settingsMap
- * @param {string} footerMsg message to display at the 2nd row from the bottom
  * @param {string[]} statusMsg messages to display at the bottom row (each for left and right side)
  * @param {number} [choiceIndex=0] current selected setting value choice index, for example
  * for **Boolean** choiceIndex can be 0 or 1, for **Enum** it can be 0, 1, 2, etc
@@ -603,22 +606,26 @@ function drawSettingEditor(
             break;
 
          case 'enum':
-            sValue = ncc(color.gold) + setting.eValues[setting.value];
-            leftPanelItems = setting.eValues.map((v, i) => {
-               if(i === setting.default)
-                  return v + ncc(color.gold) + ncc('Italic') + ' (default)' + ncc(color.gray7);
+            if(typeof setting.value == 'number'){
+               sValue = ncc(color.gold) + setting.eValues[setting.value];
+               leftPanelItems = setting.eValues.map((v, i) => {
+                  if(i === setting.default)
+                     return v + ncc(color.gold) + ncc('Italic') + ' (default)' + ncc(color.gray7);
 
-               return v + ncc(color.gray7);
-            });
-            hearderMsg = 'Chose a value from the left panel';
-            footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'W S'+ncc(color.gray9)+' to move';
-            leftPIndex = choiceIndex;
-            rightPanelActive = false;
+                  return v + ncc(color.gray7);
+               });
+               hearderMsg = 'Chose a value from the left panel';
+               footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'W S'+ncc(color.gray9)+' to move';
+               leftPIndex = choiceIndex;
+               rightPanelActive = false;
 
-            if(setting.valueDesc)
-               optionDesc = setting.valueDesc[setting.value];
-            if(setting.default !== undefined)
-               defaultStr = ncc(color.gold) + setting.eValues[setting.default];
+               if(setting.default !== undefined)
+                  defaultStr = ncc(color.gold) + setting.eValues[setting.default];
+            }
+            else {
+               writeLog(`Invalid setting value type for enum setting\nsetting: ${to.yuString(setting)}`, 2);
+               hearderMsg = 'error while parsing setting value';
+            }
             break;
 
          case 'number':
@@ -687,16 +694,17 @@ function drawSettingEditor(
 
             leftPIndex = rightPanelActive? settingIndex: choiceIndex;
 
-            rightPanelItems = [
-               ...setting.value.map(v => v.toString()),
-               '➕ [add new binding]',
-               `♻️ [${ncc('Red')}reset all bindings${ncc(color.gray7)}]`
-            ].map((v, i) =>
-               i == trackers.selBindingIndex
-                  ? ncc(color.gray3, 'bg')+ncc(color.grayB)+ncc('Bright')+to.padEnd(` •${v} `, terminalHalf - 4, ' ', 2)+ncc()+ncc(color.gray1, 'bg')+ncc(color.gray7)
-                  : ` ${v} `
-            );
-
+            if(setting.value instanceof Array){
+               rightPanelItems = [
+                  ...setting.value.map(v => v.toString()),
+                  '➕ [add new binding]',
+                  `♻️ [${ncc('Red')}reset all bindings${ncc(color.gray7)}]`
+               ].map((v, i) =>
+                  i == trackers.selBindingIndex
+                     ? ncc(color.gray3, 'bg')+ncc(color.grayB)+ncc('Bright')+to.padEnd(` •${v} `, terminalHalf - 4, ' ', 2)+ncc()+ncc(color.gray1, 'bg')+ncc(color.gray7)
+                     : ` ${v} `
+               );
+            }
 
 
             if(setting.value[trackers.selBindingIndex]){
@@ -815,10 +823,17 @@ function drawSettingEditor(
  * @param {string[]} choices
  * @param {number} selectedIndex
  * @param {string[]} statusMsg
- * @param {{itemWidth: number,itemHeight: number, colCount: number, rowCount: number}} [menuProps={}]
+ * @param {{itemWidth?: number,itemHeight?: number, colCount?: number, rowCount?: number}} [menuProps={}]
  */
 function drawMainMenu(choices, selectedIndex, statusMsg = ['', ''], menuProps = {}){
-   const footerMsg = `${ncc(color.mikuCyan)}← → ↑ ↓${ncc(color.gray9)} to Move, ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to select, ${ncc(color.mikuCyan)}Ctrl+C${ncc(color.gray9)} to Exit`;
+   const bg7 = ncc(color.gray7, 'bg'),
+      g7 = ncc(color.gray7),
+      g3 = ncc(color.gray3),
+      bg3 = ncc(color.gray3, 'bg'),
+      g9 = ncc(color.gray9),
+      reset = ncc(),
+      g0 = ncc('Black');
+   const footerMsg = `${ncc(color.mikuCyan)}← → ↑ ↓${g9} to Move, ${ncc(color.mikuCyan)}Enter${g9} to select, ${ncc(color.mikuCyan)}Ctrl+C${g9} to Exit`;
    let menuElem = [];
    const choiceLayers = choices.map(v => {
       let layers = [];
@@ -854,17 +869,17 @@ function drawMainMenu(choices, selectedIndex, statusMsg = ['', ''], menuProps = 
 
                if(layer == 0||layer == itemHeight - 1){
                   if(choiceIndex == selectedIndex){
-                     menuElem[currLine] += ncc(color.gray7, 'bg')+ncc(color.gray7) + '░'+''.padEnd(itemWidth - 2) + '░'+ncc();
+                     menuElem[currLine] += bg7 + g7 + '░'+''.padEnd(itemWidth - 2) + '░' + reset;
                   }
-                  else menuElem[currLine] +=  ncc(color.gray3, 'bg')+ncc(color.gray3) + '░' + (' '.padEnd(itemWidth - 2))+ '░' + ncc();
+                  else menuElem[currLine] +=  bg3 + g3 + '░' + (' '.padEnd(itemWidth - 2))+ '░' + reset;
                   continue;
                }
 
                let choice = choiceLayers[choiceIndex];
                if(choiceIndex == selectedIndex){
-                  menuElem[currLine] += ncc(color.gray7, 'bg')+ncc(color.gray7) + '░' + ncc('Black') + to.strSurround(choice?.[layer] ?? '', ' ', itemWidth - 2, 2) +ncc(color.gray7)+ '░' + ncc();
+                  menuElem[currLine] += bg7 + g7 + '░' + g0 + to.strSurround(choice?.[layer] ?? '', ' ', itemWidth - 2, 2) + g7 + '░' + reset;
                }
-               else menuElem[currLine] += ncc(color.gray3, 'bg')+ncc(color.gray3) + '░' + ncc(color.gray9) + to.strSurround(choice?.[layer] ?? '', ' ', itemWidth - 2, 2) +ncc(color.gray3)+ '░' + ncc();
+               else menuElem[currLine] += bg3 + g3 + '░' + g9 + to.strSurround(choice?.[layer] ?? '', ' ', itemWidth - 2, 2) + g3 + '░' + reset;
             }
 
             currLine++;
@@ -875,28 +890,30 @@ function drawMainMenu(choices, selectedIndex, statusMsg = ['', ''], menuProps = 
    // add trimmed content indicators
    menuElem = [
       rowStartOffset != 0
-         ? ncc(color.gray7) + to.strSurround('▲', ' ', colCount * itemWidth, -1): '',
+         ? g7 + to.strSurround('▲', ' ', colCount * itemWidth, -1): '',
       ...menuElem,
       // here choiceIndex is the index of the last choice printed in the screen
       // but because of how for loop works, it will be 1 more than the actual index
       choiceIndex < choices.length
-         ? ncc(color.gray7) + to.strSurround('▼', ' ', colCount * itemWidth, -1): '',
+         ? g7 + to.strSurround('▼', ' ', colCount * itemWidth, -1): '',
    ];
 
    terminal.clearScreen();
    terminal.display(
-      ncc(color.gray3, 'bg')+ncc(color.gray9)+ncc('Bright') + `░ ${to.strJustify(header, terminal.width - 4, { align: 'spacebetween', collapseLocation: 'mid', overflow: 'collapse', redundancyLv: 0 })} ░` + ncc(),
+      bg3 + g9 + ncc('Bright') + `░ ${to.strJustify(header, terminal.width - 4, { align: 'spacebetween', collapseLocation: 'mid', overflow: 'collapse', redundancyLv: 0 })} ░` + reset,
       'left', 0
    );
 
    terminal.display(
-      ncc() + menuElem.join('\n'),
-      'center', 'center',
+      menuElem,
+      'center', 'center', {
+         length: itemWidth * colCount,
+      }
    );
 
    terminal.cursorTo(0, terminal.height - 2);
-   terminal.write(ncc(color.gray3, 'bg')+ncc(color.gray9) + `░ ${to.strJustify(footerMsg, terminal.width - 4, {align: 'left', overflow: 'collapse', collapseLocation: 'end', redundancyLv: 0})+ncc(color.gray9)} ░\n` +
-   ncc(color.gray3, 'bg')+ncc(color.gray9) + `░ ${to.strJustify(statusMsg, terminal.width - 4, {align: 'spacebetween', overflow: 'collapse', collapseLocation: 'mid', redundancyLv: 0})+ncc(color.gray9)} ░` + ncc());
+   terminal.write(bg3 + g9 + `░ ${to.strJustify(footerMsg, terminal.width - 4, {align: 'left', overflow: 'collapse', collapseLocation: 'end', redundancyLv: 0}) + g9} ░\n` +
+   bg3 + g9 + `░ ${to.strJustify(statusMsg, terminal.width - 4, {align: 'spacebetween', overflow: 'collapse', collapseLocation: 'mid', redundancyLv: 0}) + g9} ░` + reset);
 
    // TODO: change to terminal.display() for readability: idk why this failed to print ncc('Reset') at the end
    // terminal.display(
@@ -1904,6 +1921,7 @@ function loadPatch() {
    for(const src in patch.configSrcMap){
       const manifest = patch.configSrcMap[src].manifest;
       if(!manifest) continue;
+      if(typeof manifest.Replacer != 'string' || typeof manifest.Reviver != 'string') continue;
 
       // LINK: @jdn34 Replacer/Reviver syntax
       if(manifest.Replacer){
@@ -2062,7 +2080,7 @@ async function loadSettings() {
          return to.cleanArr([
             ...key.split(/\s/g),
             ...(value.description? value.description.split(/\s/g): ''),
-            (value.key??'')
+            (value.key ?? '')
          ]);
       }),
    );
@@ -2104,7 +2122,8 @@ async function parseSettings() {
             case 'ini':
                parsedValue = handler.parseIniKeyVal(
                   rawSettings.value,
-                  optDecl.key
+                  optDecl.key,
+                  rawSettings.src
                );
                break;
             case 'KBTupleMap':
@@ -2116,13 +2135,14 @@ async function parseSettings() {
                );
                break;
             default:
-               writeLog(`Invalid type "${patch.configSrcMap[src].type}" for "${src}"`, 2, true);
+               writeLog(`Invalid type "${patch.configSrcMap[optDecl.src].type}" for "${optDecl.src}"`, 2, true);
                continue;
          }
 
          if(!parsedValue){
             writeLog(`Failed to parse "${optName}" with type "${optionDataType}"`, 2, true);
             writeLog('failed reason: `parsedValue` is null', 2);
+            hasErrorOrWarning = true;
             continue;
          }
 
@@ -2136,6 +2156,7 @@ async function parseSettings() {
          if(optDecl.editNote) parsedValue.editNote = optDecl.editNote;
          if(optDecl.valueDesc) parsedValue.valueDesc = optDecl.valueDesc;
          if(optDecl.default !== undefined) parsedValue.default = optDecl.default;
+         if(optDecl.editable != null) parsedValue.editable = optDecl.editable;
 
          settings.parsed.set(optName, parsedValue);
       }
@@ -2144,8 +2165,10 @@ async function parseSettings() {
    for(const [key, rSetting] of settings.raw){
       let alreadyParsed = false;
       for(const [/*optName*/, parsed] of settings.parsed){
-         if(parsed.key == key){
+         if(parsed.key == key&&parsed.src == rSetting.src){
             alreadyParsed = true;
+            if(parsed.editable == false)
+               settings.parsed.delete(key);
             break;
          }
       }
@@ -2162,7 +2185,8 @@ async function parseSettings() {
          case 'ini':
             parsedValue = handler.parseIniKeyVal(
                srcConfig.value,
-               key
+               key,
+               srcConfig.src
             );
             break;
          case 'KBTupleMap':
@@ -2170,14 +2194,20 @@ async function parseSettings() {
                srcConfig.value,
                key,
                patch,
-               rSetting.src,
-               settings.allRawSettings
+               combineActionMap
             );
             break;
          default:
             writeLog(`Invalid type "${srcConfig.dataType}" in \`allRawSettings\``, 2, true);
             writeLog(`\`srcConfig\`: ${to.yuString(srcConfig)}`, 2);
             continue;
+      }
+
+      if(!parsedValue){
+         writeLog(`Failed to parse "${key}" with type "${srcConfig.dataType}"`, 2, true);
+         writeLog('failed reason: `parsedValue` is null', 2);
+         hasErrorOrWarning = true;
+         continue
       }
 
       parsedValue.src = rSetting.src;
@@ -2355,6 +2385,7 @@ ${ncc(color.mikuCyan)}...${ncc('Reset')}`
 
 
 async function doStartupTask(){
+   // @ts-expect-error could not find module
    isElevated = (await import('is-elevated')).default;
 
    if(_global.isThisProcessElevated === null){
@@ -2369,7 +2400,7 @@ async function doStartupTask(){
 
 /**
  * cleanup and exit the program
- * @returns {never}
+ * @returns {never|void}
  */
 function doShutdownTask(exitCode = 0){
    if(shuttingDown) return;

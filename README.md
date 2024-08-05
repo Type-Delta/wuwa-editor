@@ -3,11 +3,11 @@
 <p align="center">
    <img src="./resources/img/banner.png" alt="banner" width="640">
 </p>
-<p style="font-size: .77em;">
-banner made with <a herf="https://github.com/rmariuzzo/github-banner">github-banner</a>
-</p>
 
-An advance setting editor for Wuthering Waves, that allows you to change any settings of the game without having to edit the game files your self.
+banner made with [github-banner](https://github.com/rmariuzzo/github-banner)
+
+
+An advance setting editor for Wuthering Waves, that allows you to change (almost) any settings of the game without having to edit the game files your self.
 
 This program aims to make it easier to change settings that would normally be inaccessible through in-game settings.
 
@@ -26,8 +26,8 @@ This program aims to make it easier to change settings that would normally be in
       - [Main Menu](#-main-menu)
       - [Settings Menu](#settings-menu)
          - [Navigation](#--navigation)
-         - [Edit Bindings](#editing---bindings)
-         - [Edit Axis (Axis-type Bindings)](#editing---axis-axis-type-bindings)
+         - [Edit Bindings](#-editing---bindings)
+         - [Edit Axis (Axis-type Bindings)](#️-editing---axis-axis-type-bindings)
       - [Restore Backup](#-restore-backup)
 - [🌌Background](#-background)
 
@@ -136,15 +136,15 @@ There are 6 types of settings:
 - **bindings** - key bindings for key presses, mouse buttons, and controller buttons. multiple keys can be bound to a single action.
 - **axis** - similar to **bindings**, but for analog inputs like mouse movement and controller sticks.
 
-of the 6 types, **bindings** and **axis** are the most complicated to work with, so I will explain them in more detail.
+of the 6 types, **bindings** and **axis** are the most complicated to work with, so I will explain them in details.
 
-first when you select a setting of type **bindings** or **axis**, you will able to select any of the **values** already bound to this action along with **and new binding** and **reset all bindings** options.
+first, when you select a setting of type **bindings** or **axis**, you will able to select any of the **values** already bound to this action along with **and new binding** and **reset all bindings** options.
 
 ![bindings menu step 1](./resources/img/program_setting_edit_binding1.png)
 
-selecting any of the **values** to edit them
+select any of the **values** to edit them
 
-##### Editing - **Bindings**
+##### 🎮 Editing - **Bindings**
 
 there are 3 pages when editing a **binding**
 
@@ -173,14 +173,14 @@ say we want to change the a binding to keyboard `Ctrl+F+E`, here is how you do i
 2. [page2] select `keyboard` as the device type.
 3. [page3] press `Ctrl+G` to enter key recording mode, then press `F`
 4. [page3] press `Ctrl+G` again, then press `E`
-5. [page3] where still missing `Ctrl` modifier, let's go back to step 2 by pressing `Esc`
+5. [page3] we still missing a `Ctrl` modifier, let's go back to step 2 by pressing `Esc`
 6. [page2] now select `modifier` as the device type.
 7. [page3] and select `Ctrl` as a modifier key.
 8. [page3] press `Ctrl+Enter` to apply the binding. (done)
 
 ![add binding example](./resources/img/add_keybind.gif)
 
-##### Editing - **Axis** (Axis-type Bindings)
+##### 🕹️ Editing - **Axis** (Axis-type Bindings)
 
 editing an **axis** is similar to **bindings**, but an additional step to select **input type** (not to be confused with **device type**).
 
@@ -207,7 +207,7 @@ say we want to set a binding to be a **scroll wheel** (`MouseWheel`) with scalin
 6. [page2] the program will prompt you to enter a scaling value, enter `80` and press `Enter`.
 7. [page2] press `Ctrl+Enter` to apply the binding. (done)
 
-next, let say you've set the `↑` (up arrow) key to pan the camera up (scaling is `40%`), however when tested in-game, the camera moves in the opposite direction, what happened?
+next, let's say you've set the `↑` (up arrow) key to pan the camera up (scaling is `40%`), however when tested in-game, the camera moves in the opposite direction, what happened?
 
 this is because the **game sees the action of paning the camera as a whole y-axis movement**,
 for the actual analog input devices (like mouse and controller) this is not a problem since, it has both **positive** and **negative** values to indicate direction of the movement. (basically, a Vector)

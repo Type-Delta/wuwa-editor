@@ -131,6 +131,85 @@
             "key": "HDRDisplayOutputNits",
             "src": "userSettings",
             "type": "number"
+         },
+         "FrameRateLimit": {
+            "description": "this setting shouldn't be edited by the user as the game would automatically overwrite it, FPS limit setting that the game will use is 'FPS Limit'",
+            "key": "FrameRateLimit",
+            "src": "userSettings",
+            "editable": false
+         },
+         "Window Position X": {
+            "description": "Set window position X (when display mode is Windowed)",
+            "key": "WindowPosX",
+            "src": "userSettings",
+            "type": "number",
+            "default": -1
+         },
+         "Window Position Y": {
+            "description": "Set window position Y (when display mode is Windowed)",
+            "key": "WindowPosY",
+            "src": "userSettings",
+            "type": "number",
+            "default": -1
+         },
+         "Quality Setting Level": {
+            "description": "Set game quality level? (may be a Duplicate of 'Quality Level' setting)",
+            "editNote": "Changing this value may reset other settings to default.\nand this may be a Duplicate of 'Quality Level' setting",
+            "key": "GameQualitySettingLevel",
+            "src": "userSettings",
+            "type": "enum",
+            "values": [
+               "Low",
+               "Medium",
+               "High",
+               "Custom"
+            ]
+         },
+         "Last Fullscreen Mode": {
+            "description": "if you wish to change the the Fullscreen mode, please use 'Display Mode' setting, is likely that the game would overwrite this setting",
+            "key": "LastConfirmedFullscreenMode",
+            "src": "userSettings",
+            "type": "enum",
+            "values": [
+               "Fullscreen",
+               "Borderless Fullscreen",
+               "Windowed"
+            ]
+         },
+         "Preferred Fullscreen Mode": {
+            "description": "if you wish to change the the Fullscreen mode, please use 'Display Mode' setting, is likely that the game would overwrite this setting",
+            "key": "PreferredFullscreenMode",
+            "src": "userSettings",
+            "type": "enum",
+            "values": [
+               "Fullscreen",
+               "Borderless Fullscreen",
+               "Windowed"
+            ]
+         },
+         "Shadow Quality": {
+            "description": "Set shadow quality",
+            "key": "sg.ShadowQuality",
+            "src": "userSettings",
+            "type": "enum",
+            "values": [
+               "Low",
+               "Medium",
+               "High",
+               "Ultra"
+            ]
+         },
+         "New Shadow Quality": {
+            "description": "may be a duplicate of 'Shadow Quality' setting",
+            "key": "KeyNewShadowQuality",
+            "src": "advanceSettings",
+            "type": "enum",
+            "values": [
+               "Low",
+               "Medium",
+               "High",
+               "Ultra"
+            ]
          }
       },
       "bindings": {
@@ -499,7 +578,7 @@
             "type": "bindings"
          },
          "UI Keyb. F - SpaceBar": {
-            "description": "Not sure what this does. default key is 'F' and 'Space",
+            "description": "Not sure what this does. default key is 'F' and 'Space'",
             "key": "UI键鼠F空格",
             "src": "inputSettings",
             "allowMultiple": true,
@@ -564,6 +643,29 @@
             "src": "inputSettings",
             "allowMultiple": true,
             "type": "bindings"
+         }
+      },
+      "Others": {
+         "UserSettings.Version": {
+            "description": "may be a version for 'GameUserSettings.ini' file",
+            "key": "Version",
+            "src": "userSettings",
+            "type": "number",
+            "default": 5
+         },
+         "Culture": {
+            "description": "may be a Game language or Localization setting",
+            "key": "Culture",
+            "src": "userSettings",
+            "type": "string",
+            "default": "en"
+         },
+         "IsAutoSwitchSkillButtonMode": {
+            "description": "Not sure what this does or supposed to mean T.T",
+            "key": "IsAutoSwitchSkillButtonMode",
+            "src": "advanceSettings",
+            "type": "number",
+            "default": 0
          }
       }
    },

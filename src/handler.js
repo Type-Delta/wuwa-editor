@@ -27,7 +27,7 @@ to._modules.fs = fs;
       BindingGroups,
       ParsedGameSettings,
       AllRawSettings
- * } from './editor.js
+ * } from './editor.js'
  */
 
 /**
@@ -48,6 +48,9 @@ to._modules.fs = fs;
  * @property {(key: 'Cmd'|'Alt'|'Shift'|'Ctrl', value: boolean) => void} setModifier
  * @property {(newValue: Keys|(Keys)[], typeRef: 'keyboard'|'mouse'|'controller'|GameSettingPatch) => void} set
  * @property {() => string} toString
+ * @property {(key: Keys|(Keys)[], typeRef: 'keyboard'|'mouse'|'controller'|GameSettingPatch) => void} append
+ * @property {() => Keys|null} pop
+ * @property {() => KeyBind} clone
  */
 class KeyBind {
    /**
@@ -209,6 +212,9 @@ class KeyBind {
  * @property {number} scale
  * @property {(newValue: Axis, typeRef: DeviceTypes|GameSettingPatch) => void} set
  * @property {() => string} toString
+ * @property {(value: Axis, typeRef: DeviceTypes|GameSettingPatch) => void} append
+ * @property {() => Axis|null} pop
+ * @property {() => AxisBind} clone
  */
 class AxisBind {
    /**
@@ -438,9 +444,10 @@ async function loadIniKeyVal(configPath, settingSrc){
 /**
  * @param {any} rawSetting raw settings of this source file
  * @param {string} settingKey
+ * @param {string} srcFile file path this setting originated from
  * @return {ParsedGameSettingObj|null} parsed setting object
  */
-function parseIniKeyVal(rawSetting, settingKey){
+function parseIniKeyVal(rawSetting, settingKey, srcFile){
    let setting = undefined;
    let group = null;
    for(group in rawSetting){
@@ -452,7 +459,7 @@ function parseIniKeyVal(rawSetting, settingKey){
 
    if(setting?.[settingKey] == undefined){
       writeLog(
-         `Key "${settingKey}" not found in source config`,
+         `Key "${settingKey}" not found in source config "${srcFile}"`,
          2, true
       );
       return null;
@@ -764,8 +771,7 @@ async function loadKBTupleMap(configPath, settingSrc) {
  * @param {SrcKBTupleMap} rawSetting
  * @param {string} settingKey
  * @param {GameSettingPatch} patch
- * @param {string} srcName
- * @param {AllRawSettings} allRawSettings
+ * @param {*} combineActionMap
  * @return {ParsedGameSettingObj|null} parsed setting object
  */
 function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){

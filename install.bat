@@ -28,16 +28,19 @@ echo pushd "%%~dp0">> wuwa-editor.bat
 echo set programPath=%currentPath%>> wuwa-editor.bat
 echo.>> wuwa-editor.bat
 echo :: check path>> wuwa-editor.bat
-echo if not exist wuwa-editor.anchor ^(>> wuwa-editor.bat
+echo if not exist anchor.wuwa-editor ^(>> wuwa-editor.bat
 echo cd "%%programPath%%">> wuwa-editor.bat
-echo if not exist wuwa-editor.anchor ^(>> wuwa-editor.bat
+echo if not exist anchor.wuwa-editor ^(>> wuwa-editor.bat
 echo echo Can't find anchor file, did you change the program's location?>> wuwa-editor.bat
 echo echo if so, please run "install.bat" again.>> wuwa-editor.bat
+echo echo Current Dir: %%~dp0>> wuwa-editor.bat
 echo pause>> wuwa-editor.bat
 echo goto EOF>> wuwa-editor.bat
 echo ^)>> wuwa-editor.bat
 echo ^)>> wuwa-editor.bat
 echo npm run start>> wuwa-editor.bat
+echo.>> wuwa-editor.bat
+echo :EOF>> wuwa-editor.bat
 
 echo this file tells the launch script it's in the correct directory> anchor.wuwa-editor
 echo DO NOT REMOVE!>> anchor.wuwa-editor

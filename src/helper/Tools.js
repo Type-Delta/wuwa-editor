@@ -1,12 +1,13 @@
 //////////// Tools ////////////
 /**# tools for Javascript
- * @version 2.12.11
+ * @version 2.12.12
  * for Node.js >= 16.x.x
+ * @module Tools
  * @changes
+ * - fix: types error
  * - remove: modification of Object prototypes
  * - add: changeDateTimezone()
- * - update: JSDoc now uses @template
- * - deprecate: objectMap() (ops, it's not needed)
+ * - update: JSDoc now uses template
  *
  * DISCLAIMER: parts of this code are based on or copied (with slight modification) from other sources.
  * for license information, please refer to the respective sources.
@@ -176,7 +177,7 @@ class Dopri {
       this.ymid = ymid;
       this.iterations = iterations;
       this.events = events;
-      this.message = msg;
+      this.msg = msg;
    }
 
    _at(xi, j) {
@@ -206,6 +207,7 @@ class Dopri {
 
    /**
     * @param {number|number[]} x
+    * @returns {number|number[]}
     */
    at(x) {
       let i, j, k;
@@ -273,9 +275,9 @@ const Tools = {
     * @property {number} [maxRow=10] maximum number of displayable "rows" of each layer
     * @property {number} [maxCol=20] maximum number of displayable "columns" of each layer
     * @property {boolean} [color=false] enable syntax highlighting
-    * @property {number} [defColor] default color: color used for reseting foreground color,
+    * @property {number|string} [defColor] default color: color used for reseting foreground color,
     * without this option will reset all color and formatting
-    * @property {boolean} noHeader disable type heading that shows the type and dimensions of the given array.
+    * @property {boolean} [noHeader] disable type heading that shows the type and dimensions of the given array.
     *
     * this does not affect values inside the array
     */
@@ -283,7 +285,7 @@ const Tools = {
     * parse Array-Like object to string representation of it's values
     * with syntax highlighting
     *
-    * @param {any[]} arr - Array-Like object
+    * @param {any[]|any} arr - Array-Like object
     * @param {ArrToStringOptions} [options] - options
     * @returns {string} string representation of the array
     */
@@ -430,7 +432,7 @@ const Tools = {
    ```
    */
    argvHasFlag(flag, argv = process?.argv) {
-      if(!argv||!flag) return false;
+      if(!argv||typeof flag != 'string') return false;
 
       const prefix = flag.startsWith('-') ? '' : (flag.length === 1 ? '-' : '--');
       const position = argv.indexOf(prefix + flag);
@@ -444,7 +446,7 @@ const Tools = {
     */
    async asyncSleep(milliseconds){
       return new Promise((resolve, reject) => {
-         if(!milliseconds||milliseconds < 0) resolve();
+         if(!milliseconds||milliseconds < 0||typeof milliseconds != 'number') resolve();
 
          const date = Date.now();
          const checkTime_inter = setInterval(checkTime, 1);
@@ -510,7 +512,7 @@ const Tools = {
          //add \n
          // console.log(reading, nextNearest);
          let isolated = JsonString.substring(reading, nextNearest);
-         let quoteIndex = Tools.getMatchAllIndexes(isolated.matchAll("\""))
+         let quoteIndex = Tools.getMatchAllIndexes(isolated.matchAll(/"/g))
             .filter(i => i != 0? isolated[i - 1] != "\\": true); //remove index of " that has \ as prefix
          if((quoteIndex.length % 2) != 0)
             throw new Error("cannot match Double-Quote correctly from string: \"" + isolated + '\"');
@@ -604,7 +606,10 @@ const Tools = {
     */
    charTypeAt(index, str){
       const table = Tools.CONSTS.UNICODES_RANGE_TABLE;
+      if(index < 0) index = str.length + index;
       const code = str.charCodeAt(index);
+
+      if(isNaN(code)) return null;
 
       for(let i = table.length >> 1, opt = 0; i >= 0&&i < table.length; opt++){
          if(opt > (table.length >> 1) + 1) break;
@@ -633,22 +638,35 @@ const Tools = {
 
 
    CheckCache: class CheckCache {
-      static #supportsColor;
-      static #supportsHyperlink;
-      static #forceColor;
+      /**@type {null|boolean} */
+      static #supportsColor = null;
+      /**@type {null|boolean} */
+      static #supportsHyperlink = null;
+      /**@type {null|boolean} */
+      static #forceColor = null;
 
       static get supportsColor(){
-         if(this.#supportsColor === undefined)
+         if(this.#supportsColor == null)
             this.#supportsColor = Tools.supportsColor();
 
          return this.#supportsColor;
       }
 
       static get supportsHyperlink(){
-         if(this.#supportsHyperlink === undefined)
+         if(this.#supportsHyperlink == null)
             this.#supportsHyperlink = Tools.supportsHyperlink();
 
          return this.#supportsHyperlink;
+      }
+
+      /**@param {null|boolean} value */
+      static set supportsColor(value){
+         this.#supportsColor = value;
+      }
+
+      /**@param {null|boolean} value */
+      static set supportsHyperlink(value){
+         this.#supportsHyperlink = value;
       }
 
       static get forceColor(){
@@ -697,14 +715,14 @@ const Tools = {
     * @returns new cleaned array
     */
    cleanArr(arr, itemToClean = null){
-      if(itemToClean && Tools.isArrayLike(itemToClean)){
-         return arr.filter(function (itemInArr) {
+      if(itemToClean && itemToClean instanceof Array){
+         return arr.filter((itemInArr) => {
             return !itemToClean.includes(itemInArr);
          });
       }
 
-      if(itemToClean){
-         return arr.filter(function (itemInArr) {
+      if(itemToClean !== null){
+         return arr.filter((itemInArr) =>  {
             return itemInArr !== itemToClean;
          });
       }
@@ -798,9 +816,12 @@ const Tools = {
        * appears in the given array
        * @template T
        * @param {T[]|string} arr
-       * @returns {Map<T, number>} frequency of each unique elements
+       * @returns {Map<T|string, number>} frequency of each unique elements
        */
       frequencyOf(arr){
+         if(!arr||(typeof arr != 'string'&&!Tools.isArrayLike(arr)))
+            return new Map();
+
          const uniqueElems = [...new Set(arr)];
          let fqMap = new Map(
             uniqueElems.map(v => [v, 0])
@@ -916,7 +937,7 @@ const Tools = {
        * @returns {number} length of the LCS string
        */
       LCSLength_of(arrA, arrB, comparator = (a, b) => a === b){
-         if(!(arrA?.length&&arrB?.length)) return [];
+         if(!(arrA?.length&&arrB?.length)) return 0;
 
          /**3d matrix:
           * row: representative of strA
@@ -1367,9 +1388,9 @@ const Tools = {
       }
 
       /**
-       * @typedef {Object} Err_toStringOptions
+       * @typedef {object} Err_toStringOptions
        * @property {boolean} [color=false] colorize the output
-       * @property {number} [defColor=undefined] default color, used for reseting the color
+       * @property {number|string} [defColor=undefined] default color, used for reseting the color
        * without this, the will be reset all color and style to default
        */
       /**
@@ -1809,7 +1830,7 @@ const Tools = {
       }
 
       /**
-       * @returns {Promise<number|undefined>} port number if `protocol` is `udp4` or `udp6`
+       * @returns {Promise<number|void>} port number if `protocol` is `udp4` or `udp6`
        */
       async #init(){
          return new Promise(resolve => {
@@ -2181,7 +2202,7 @@ const Tools = {
     * @template T
     * @param {T} value
     * @param {string} key
-    * @returns {T}
+    * @returns {({ '@dataType': string, '@value': string|any[] })|T}
     * @example
     * const objWithNonParsable = {
     *    map: new Map([[2, 'two'], [3, 'three']]),
@@ -2238,7 +2259,7 @@ const Tools = {
     * @template T
     * @param {T} value
     * @param {string} key
-    * @returns {T}
+    * @returns {T|BigInt|Map<any, any>|Set<any>}
     * @example
     * const objWithNonParsable = {
     *    map: new Map([[2, 'two'], [3, 'three']]),
@@ -2336,7 +2357,7 @@ const Tools = {
 
 
    /**return type of content judging only from file Extension
-    * @param {string}fileExt
+    * @param {string} fileName
     * @returns `'image'|'text'|'binary'|'media'|null`
     */
    fileTypeOf(fileName){
@@ -2423,7 +2444,7 @@ const Tools = {
        * @property {number} hr
        * @property {number} min
        * @property {number} sec
-       * @property {string} ms
+       * @property {number} ms
        * @property {() => string} toString
        * @property {() => string} modern to modern time string
        */
@@ -2501,7 +2522,7 @@ const Tools = {
 
    // LINK: @ndwk2s description
    /**
-    * @typedef {{[key: string]: TValue}} GenericObject
+    * @typedef {{[key: string]: TValue}|{}} GenericObject
     * @template TValue
     */
    /**
@@ -2906,8 +2927,7 @@ const Tools = {
        * @returns {number}
        */
       sum: (...Xs) => {
-         Xs = Xs.flat(5);
-         return Xs.reduce((a, b) => a + b, 0);
+         return Xs.flat(5).reduce((a, b) => a + b, 0);
       },
 
       /**Convert from Cartesian to Polar coordinates where **Theta** (t) units is specified by `unit`
@@ -2978,7 +2998,7 @@ const Tools = {
 
 
    /**
-    * @typedef {'Reset'|'Bright'|'Dim'|'Italic'|'Blink'|'Invert'|'Hidden'|'Black'|'Red'|'Green'|'Yellow'|'Blue'|'Magenta'|'Cyan'|'White'|'BgBlack'|'BgRed'|'BgGreen'|'BgYellow'|'BgBlue'|'BgMagenta'|'BgCyan'|'BgWhite'|number} NCCColorOptions
+    * @typedef {'Reset'|'Bright'|'Dim'|'Italic'|'Blink'|'Invert'|'Hidden'|'Black'|'Red'|'Green'|'Yellow'|'Blue'|'Magenta'|'Cyan'|'White'|'BgBlack'|'BgRed'|'BgGreen'|'BgYellow'|'BgBlue'|'BgMagenta'|'BgCyan'|'BgWhite'|number|string} NCCColorOptions
     */
    /**(**Node Console Color**) return the Node.js Console Text formats, use this format to change
     * how Console Text looks.
@@ -3021,7 +3041,7 @@ const Tools = {
             return `\x1b[${mode == 'bg'?'4':'3'}8;2;${rgb.r};${rgb.g};${rgb.b}m`;
          }
 
-         color = (mode == 'bg'?'bg':'') + _8bitColorFromRGB(rbg);
+         color = (mode == 'bg'?'bg':'') + _8bitColorFromRGB(rgb);
       }
 
       color = color.toLocaleLowerCase();
@@ -3062,6 +3082,7 @@ const Tools = {
          const b = rgb.b > 127;
 
          // switch how much color is being mixed in
+         // @ts-expect-error adding boolean with another boolean
          switch(r + g + b){
             case 3: return 'white';
             case 0: return 'black';
@@ -3215,7 +3236,7 @@ const Tools = {
       // age: Arg { value: 34, index: 6, type: 'int' },
       // gender: Arg { value: 'f', index: -1, type: 'choice' } }
     * @param {string[]} args commandline args
-    * @param {Object} params Paramiter rules object
+    * @param {object} template Paramiter rules object
     * @param {boolean} caseSensitive
     * @returns {ParseArgs}
     */
@@ -3360,9 +3381,9 @@ const Tools = {
 
    /**parse configuration file in UTF-8 encoding to a Javascript Object
     * @param {string}ConfigString configuration file content
-    * @param {function(any, string, any): any} [JSONReviver=null] JSON reviver function, to parse JSON Object in side the config file
-    * @param {{ignoreGroups: boolean}} [options]
-    * @returns {Object} configuration in Javascript Object
+    * @param {function(this: any, string, any): any} [JSONReviver=null] JSON reviver function, to parse JSON Object in side the config file
+    * @param {{ignoreGroups?: boolean}} [options]
+    * @returns {object} configuration in Javascript Object
     * @example //in main file
     * const fs = require('fs');
     *
@@ -3811,9 +3832,9 @@ const Tools = {
        * match any ANSI code
        *
        * if hyperlinks are found, will only match beginning and the end of a hyperlink escape sequence,
-       * along with the URL but kept the Label untouched.
+       * along with the Lable but kept the URL untouched.
        */
-      ANSICode: /\x1b\[\d{1,3}(?:;\d{1,3})*m|\x1b\]8;;[^\x07]+\x07|(?<=\x07[\w\s]+)\x07\]8;;\x07/g,
+      ANSICode: /\x1b\[\d{1,3}(?:;\d{1,3})*m|\x1b\]8;;|(?<=[^\x07]+)\x07[^\x07]+\]8;;\x07/g,
       /**
        * ## match any single Emoji Unicode
        * Created by Wiktor Stribiżew, Sep 9, 2021
@@ -4110,13 +4131,13 @@ const Tools = {
 
    /**
     * @typedef {object} StringifyConfigOptions
-    * @property {string[]|undefined} ignoreList list of keys to ignore
-    * @property {boolean|undefined} minify minify the JSON output
-    * @property {((key: any, value: any) => {})|undefined} replacer JSON replacer
-    * @property {'merge'|'replace'|undefined} mode write mode, 'merge' will merge the new config with the old one, 'replace' will replace the old config with the new one (default to 'merge')
+    * @property {string[]|undefined} [ignoreList] list of keys to ignore
+    * @property {boolean|undefined} [minify] minify the JSON output
+    * @property {((key: any, value: any) => {})|undefined} [replacer] JSON replacer
+    * @property {'merge'|'replace'|undefined} [mode] write mode, 'merge' will merge the new config with the old one, 'replace' will replace the old config with the new one (default to 'merge')
     * @property {boolean|undefined} [useIniGroup=false] use ini groupping, use keys in the first level as groupName
-    * @property {boolean|undefined} alwaysWrapStrInQuotes always wrap string in quotes even if it's not required (doesn't have space, special char, etc.)
-    * @property {string|undefined} oldConfigStr the old config string to merge with (for mode 'merge' only)
+    * @property {boolean|undefined} [alwaysWrapStrInQuotes] always wrap string in quotes even if it's not required (doesn't have space, special char, etc.)
+    * @property {string|undefined} [oldConfigStr] the old config string to merge with (for mode 'merge' only)
     */
    /**
     * stringify configuration object to a config string which can be saved to a file later.
@@ -4392,7 +4413,7 @@ const Tools = {
          case 'end':
             return Tools.strSlice(str, 0, leftoverAmu) + "...";
          case 'start':
-            return "..." + Tools.strSlice(str, leftoverAmu);
+            return "..." + Tools.strSlice(str, strLen - leftoverAmu);
       }
    },
 
@@ -4401,8 +4422,8 @@ const Tools = {
     * slice string, similar to `String.slice()` but with string
     * @param {string} str string to slice
     * @param {number} start start index
-    * @param {number} [end] end index
-    * @param {number} [redundancyLv=0] complexity of how string width (size that will be displayed, not to be confused with the actual *length* of the string) is calculated (suports `-1`: none, `0`:  ANSI code, `1`: fullwidth chars, `2`: Emoji)
+    * @param {number?} [end] end index
+    * @param {number?} [redundancyLv=0] complexity of how string width (size that will be displayed, not to be confused with the actual *length* of the string) is calculated (suports `-1`: none, `0`:  ANSI code, `1`: fullwidth chars, `2`: Emoji)
     */
    strSlice(str, start, end, redundancyLv = 0){
       let ANSIIndexs = [...str.matchAll(Tools.REGEXP.ANSICode)]
@@ -4473,7 +4494,7 @@ const Tools = {
 
 
    /**
-    * @typedef {Object} strWrapOptions
+    * @typedef {object} strWrapOptions
     * @property {string|number} [indent=''] the string to put in front of each line
     *
     * if `number` is given, will put WhiteSpace with that length instead
@@ -4509,13 +4530,12 @@ const Tools = {
       const HardSep_reg = Tools.REGEXP.HardWrapSeperators;
 
       const innerBound = maxLineLength * 0.67;
-      str = str.toString().split('\n');
       if(typeof firstIndent == 'number')
          firstIndent = ''.padEnd(firstIndent, ' ');
       if(typeof indent == 'number')
          indent = ''.padEnd(indent, ' ');
 
-      for(let eachLine of str){
+      for(let eachLine of str.split('\n')){
          while(Tools.ex_length(eachLine, redundancyLv) > maxLineLength){
             const indexesOfSep = Tools.getMatchAllIndexes(eachLine.matchAll(SoftSep_reg))
                .filter(v => v >= innerBound);
@@ -4817,7 +4837,7 @@ const Tools = {
       /**return the closing version of a given Bracket
        */
       function closeBracket(brack){
-         return string.fromCharCode(
+         return String.fromCharCode(
             brack.charCodeAt(0) + (brack[0] == '('? 1 :2)
          );
       }
@@ -4830,7 +4850,7 @@ const Tools = {
        */
       time;
       /**this also control how often should timer do the checking
-       * @type {'ms','s','m'}
+       * @type {'ms'|'s'|'m'}
        */
       resolution;
       isRunning = false;
@@ -4847,7 +4867,7 @@ const Tools = {
        *
        * however, this can varies
        * @param {number} time start time
-       * @param {'ms','s','m'} resolution
+       * @param {'ms'|'s'|'m'} resolution
        */
       constructor(time, resolution = 'ms'){
          this.maxTime = this.time = time;
@@ -5112,12 +5132,12 @@ const Tools = {
 
    /**
     * @typedef {Object} WriteConfigOptions
-    * @property {string[]|undefined} ignoreList list of keys to ignore
-    * @property {boolean|undefined} minify minify the JSON output
-    * @property {((key: any, value: any) => {})|undefined} replacer JSON replacer
-    * @property {'merge'|'replace'|undefined} mode write mode, 'merge' will merge the new config with the old one, 'replace' will replace the old config with the new one (default to 'merge')
+    * @property {string[]|undefined} [ignoreList] list of keys to ignore
+    * @property {boolean|undefined} [minify] minify the JSON output
+    * @property {((key: any, value: any) => {})|undefined} [replacer] JSON replacer
+    * @property {'merge'|'replace'|undefined} [mode] write mode, 'merge' will merge the new config with the old one, 'replace' will replace the old config with the new one (default to 'merge')
     * @property {boolean|undefined} [useIniGroup=false] use ini groupping, use keys in the first level as groupName
-    * @property {boolean|undefined} alwaysWrapStrInQuotes always wrap string in quotes even if it's not required (doesn't have space, special char, etc.)
+    * @property {boolean|undefined} [alwaysWrapStrInQuotes] always wrap string in quotes even if it's not required (doesn't have space, special char, etc.)
     */
    /**
     * asynchronously write configuration to the given path
@@ -5242,7 +5262,7 @@ const Tools = {
       try{
          if(typeof whatever === 'object'){
             if(Tools.isArrayLike(whatever)){
-               return Tools.arrToString(values, { color, defColor });
+               return Tools.arrToString(whatever, { color, defColor });
             }
 
             // TODO: add syntax highlighting for object
@@ -5259,4 +5279,5 @@ const Tools = {
 
 
 if(typeof module !== 'undefined') module.exports = Tools;
+// @ts-expect-error _tools doesn't exist on window
 if(typeof window !== 'undefined') window._tools = Tools;
