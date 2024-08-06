@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-// @ts-expect-error can't find module
 const _ = require('lodash');
 let isElevated = null; // require('is-elevated')
 
@@ -40,6 +39,10 @@ const { color } = _global;
 /**
  * @typedef {Keys|'MouseX'|'MouseY'|'MouseWheel'|'MousePos'|'LT_Axis'|'RT_Axis'|'LS_H'|'LS_V'|'LS_B'|'RS_H'|'RS_V'|'RS_B'} Axis
 */
+
+/**
+ * @typedef {'Shift'|'Ctrl'|'Alt'|'Cmd'} Modifiers
+ */
 
 /**
  * @typedef {'keyboard'|'mouse'|'controller'} DeviceTypes
@@ -123,14 +126,14 @@ const { color } = _global;
  * @property {string|undefined} rootProperty name of property that will be treated as root object for the setting (points to the setting object)
  * @property {string[]|undefined} acceptedGroups whitelist of setting groups to parse, if empty all groups will be parsed
  * @property {string[]|undefined} includeSrc list of setting source file to include while parsing
- * @property {string|'default'|'none'|((key: string, value: any, context: {source: any}) => any)|undefined} Reviver function to use when parsing settings (would be used instead of JSONReviver when parsing JSON type settings)
+ * @property {string|'default'|'none'|((this: any, key: string, value: any) => any)|undefined} Reviver function to use when parsing settings (would be used instead of JSONReviver when parsing JSON type settings)
  *  this reviver works the same as the reviver parameter in JSON.parse()
  *
  * available values:
  * - 'default': use default reviver
  * - 'none': don't use any reviver (default)
  * - `<$func>`: use custom reviver function defined with syntax `$func:<functionBody>` with two parameters `key`, `value` and `context` object (see [MDN Doc](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse#the_reviver_parameter))
- * @property {string|'default'|'none'|((key: string, value: any) => any)|undefined} Replacer function to use when writing settings (would be used instead of JSONReplacer when stringify JSON type settings)
+ * @property {string|'default'|'none'|((this: any, key: string, value: any) => any)|undefined} Replacer function to use when writing settings (would be used instead of JSONReplacer when stringify JSON type settings)
  *
  * available values:
  * - 'default': use default replacer
@@ -328,10 +331,10 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
 
    hasErrorOrWarning = false;
    writeLog('Loading UI...', 3, true);
-
+   _global.disableTerminalLoggin = true;
 
    terminal.log('\n'.padEnd(terminal.height - 1, '\n'));
-   await showMainMenu(settings.parsed, patch, settingTFIDF, settingSearchFields);
+   await showMainMenu(settingTFIDF, settingSearchFields);
    doShutdownTask();
 })();
 
@@ -1678,10 +1681,8 @@ async function showSettingEditMenu(settingsMap, settingIndex){
 
 
 /**
- * @param {Map} settingsMap
- * @param {object} patch
  */
-async function showMainMenu(settingsMap, patch, settingTFIDF, settingSearchFields){
+async function showMainMenu(settingTFIDF, settingSearchFields){
    const settingGroups = [
       ...Object.keys(patch.options), '[Uncategorized]',
       '📥\nSave Settings', `♻️\n${ncc('Red')}Revert Changes`,
@@ -1787,7 +1788,7 @@ async function showMainMenu(settingsMap, patch, settingTFIDF, settingSearchField
                inOtherMenu = true;
                await showSettings(
                   settingGroups[selectedIndex],
-                  settingsMap, settingTFIDF, settingSearchFields
+                  settings.parsed, settingTFIDF, settingSearchFields
                );
                inOtherMenu = false;
                statusMsg[1] = changesBackup.size + ' unsaved changes'
@@ -1823,7 +1824,7 @@ async function showMainMenu(settingsMap, patch, settingTFIDF, settingSearchField
 async function showRestoreBackupMenu(){
    const backupFileNames = getBackupList();
 
-   const footerMsg = `${ncc(color.mikuCyan)}← → ↑ ↓${ncc(color.gray9)} to Move, ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to ${ncc('Red')}restore selected${color.gray9},  `+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back';
+   const footerMsg = `${ncc(color.mikuCyan)}← → ↑ ↓${ncc(color.gray9)} to Move, ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to ${ncc('Red')}restore${ncc(color.gray9)} selected,  `+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back';
    let selectedIndex = 0, statusMsg = ['', ''];
    let restoring = false;
    let awitConfirm = false;
@@ -1871,13 +1872,13 @@ async function showRestoreBackupMenu(){
 
                if(!awitConfirm){
                   awitConfirm = true;
-                  statusMsg[0] = ncc('Red') + 'this action cannot be undone'+ncc(color.gray9)+', press Enter again to confirm';
+                  statusMsg[0] = ncc('Red') + 'this action cannot be undone'+ncc(color.gray9)+', press '+ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' again to confirm';
                   break doRestore;
                }
 
                restoring = true;
                statusMsg[0] = 'Restoring...';
-               restoreBackup(backupFileNames[selectedIndex]).then(success => {
+               restoreBackup(backupFileNames[selectedIndex]).then(async success => {
                   restoring = false;
 
                   if(!success){
@@ -1885,6 +1886,10 @@ async function showRestoreBackupMenu(){
                      drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
                      return;
                   }
+
+                  statusMsg[0] = 'Reloading settings...';
+                  drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
+                  await loadSettings(true);
 
                   terminal.removeListener('key', onKeyListener);
                   terminal.removeListener('resize', resizeListener);
@@ -2024,7 +2029,7 @@ function verifyGamePath(gamePath) {
 }
 
 
-async function loadSettings() {
+async function loadSettings(skipTFIDFCalculation = false) {
    writeLog(`Loading settings...`, 3, true);
    settings.raw = new Map();
    settings.parsed = new Map();
@@ -2074,15 +2079,18 @@ async function loadSettings() {
    parseSettings();
 
    const settingSearchFields = [];
-   const settingTFIDF = to.DataScienceKit.TFIDF_of(
-      [...settings.parsed].map(([key, value]) => {
-         settingSearchFields.push(key + ' ' + (value.description??'') + ' ' + (value.key??''));
-         return to.cleanArr([
-            ...key.split(/\s/g),
-            ...(value.description? value.description.split(/\s/g): ''),
-            (value.key ?? '')
-         ]);
-      }),
+   const settingTFIDF = (skipTFIDFCalculation
+      ? null
+      : to.DataScienceKit.TFIDF_of(
+         [...settings.parsed].map(([key, value]) => {
+            settingSearchFields.push(key + ' ' + (value.description??'') + ' ' + (value.key??''));
+            return to.cleanArr([
+               ...key.split(/\s/g),
+               ...(value.description? value.description.split(/\s/g): ''),
+               (value.key ?? '')
+            ]);
+         }),
+      )
    );
 
    writeLog(`Loaded ${settings.parsed.size} settings from ${settings.allRawSettings.size} sources.`, 3, true);
@@ -2222,20 +2230,37 @@ async function parseSettings() {
 
 /**
  * write settings to the game config files
- * return success status
+ * @return  success status
+ * - `-1` no changes to write
+ * - `0` success
+ * - `1` game is running
+ * - `2` error while writing
  */
 async function writeSettings(){
    if(!settings.parsed||changesBackup.size == 0) return -1; // no changes to write
    if(await isProcessRunning(config.gameClientName)) return 1; // game is running
 
    writeLog(`Writing settings to Game src config...`, 3);
-   writeLog(`Changes ${to.yuString(changesBackup)}`, 4);
+   writeLog(`Original of changed value: ${to.yuString(changesBackup)}`, 4);
+
+   const srcWithChanges = new Set();
+   for(const [/*name*/, parsed] of changesBackup){
+      srcWithChanges.add(parsed.src);
+
+      if(patch.configSrcMap[parsed.src]?.manifest?.includeSrc){
+         for(const src of patch.configSrcMap[parsed.src].manifest.includeSrc){
+            srcWithChanges.add(src);
+         }
+      }
+   }
 
    /**
     * @type {Map<string, Map<string, ParsedGameSettingObj>>}
     */
-   let settingsBySrc = new Map();
+   const settingsBySrc = new Map();
    for(const [key, parsed] of settings.parsed){
+      if(!srcWithChanges.has(parsed.src)) continue;
+
       if(!settingsBySrc.has(parsed.src)) settingsBySrc.set(parsed.src, new Map);
       settingsBySrc.get(parsed.src).set(key, parsed);
    }
@@ -2385,7 +2410,6 @@ ${ncc(color.mikuCyan)}...${ncc('Reset')}`
 
 
 async function doStartupTask(){
-   // @ts-expect-error could not find module
    isElevated = (await import('is-elevated')).default;
 
    if(_global.isThisProcessElevated === null){

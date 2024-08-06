@@ -1,11 +1,11 @@
-# wuwa-editor
-
+<br>
 <p align="center">
    <img src="./resources/img/banner.png" alt="banner" width="640">
 </p>
 
 banner made with [github-banner](https://github.com/rmariuzzo/github-banner)
 
+# wuwa-editor
 
 An advance setting editor for Wuthering Waves, that allows you to change (almost) any settings of the game without having to edit the game files your self.
 
@@ -214,7 +214,7 @@ for the actual analog input devices (like mouse and controller) this is not a pr
 what about the keyboard? it only has two states, **pressed** and **not pressed**, so the game has to decide which direction to move the camera when the key is pressed.
 in this case, it's down.
 
-to fix this, you have to **invert** the **scaling** value (in this case from `40%` to `-40%`), let's do it together:
+to fix this, you have to **invert** the **scaling** value (in this case from `40%` to `-40%`)
 
 > if your **scaling** value is already negative, just make it positive.
 

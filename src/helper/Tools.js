@@ -4,10 +4,11 @@
  * for Node.js >= 16.x.x
  * @module Tools
  * @changes
+ * - optimize: strWrap()
+ * - add: class ConsoleTime
  * - fix: types error
  * - remove: modification of Object prototypes
  * - add: changeDateTimezone()
- * - update: JSDoc now uses template
  *
  * DISCLAIMER: parts of this code are based on or copied (with slight modification) from other sources.
  * for license information, please refer to the respective sources.
@@ -22,6 +23,9 @@ var _modules = {
    /**3rd party Module*/
    mathjs: null,
 };
+let _global = {
+   consoleTimeInstances: null
+}
 
 /**
  * Created by Wiktor Stribiżew, Sep 9, 2021
@@ -810,6 +814,77 @@ const Tools = {
    },
 
 
+   /**
+    * mesure the amount of time it takes from the start to the end of the label
+    * similar to `console.time()` but with more control
+    *
+    * **requires JavaScript runtime environment**
+    *
+    * @example
+    * // messure average time in a loop
+    * for(const match of myString.matchAll(/a/g)){
+         Tools.ConsoleTime.elipsedStart('push');
+         indexes.push(match.index);
+         Tools.ConsoleTime.elipsedEnd('push');
+      }
+
+      Tools.ConsoleTime.condense('push')?.print(); // -> push: 1.23ms
+    */
+   ConsoleTime: class ConsoleTime {
+      static lookbackLimit = 100;
+
+      static elipsedStart(label){
+         if(_global.consoleTimeInstances == null){
+            _global.consoleTimeInstances = new Map([
+               [label, [Tools.getProcessTime()]]
+            ]);
+            return;
+         }
+
+         if(!_global.consoleTimeInstances.has(label)){
+            _global.consoleTimeInstances.set(label, [Tools.getProcessTime()]);
+            return;
+         }
+
+         const elipsed = _global.consoleTimeInstances.get(label);
+         elipsed.unshift(Tools.getProcessTime());
+
+         if(this.lookbackLimit > 0&&elipsed.length >= this.lookbackLimit)
+            elipsed.pop();
+      }
+
+      static elipsedEnd(label){
+         if(!_global.consoleTimeInstances.has(label)) return;
+
+         const elipsed = _global.consoleTimeInstances.get(label);
+         const start = elipsed[0];
+         elipsed[0] = Tools.getProcessTime() - start;
+      }
+
+      static condense(label){
+         const elipsed = _global.consoleTimeInstances.get(label);
+
+         if(!elipsed) return null;
+
+         let avg = 0;
+         for(const eachTime of elipsed){
+            avg += eachTime;
+         }
+         avg /= elipsed.length;
+         _global.consoleTimeInstances.delete(label);
+
+         return {
+            print(){
+               console.log(label + ': ' + Tools.toShortNum(avg) + 's');
+            },
+            valueOf: () => avg,
+            toString: () => label + ': ' + Tools.toShortNum(avg) + 's',
+            value: avg
+         }
+      }
+   },
+
+
 
    DataScienceKit: {
       /**calculate how many times each unique elements
@@ -1514,14 +1589,16 @@ const Tools = {
 
 
    /**get an Array of matched index from `string.matchAll()`
-    * @param {IterableIterator<RegExpMatchArray>}matchArr
+    *
+    * **this function is RESOURCE INTENSIVE use it wisely**
+    * @param {IterableIterator<RegExpMatchArray>} matches
     * @returns {number[]}
     */
-   getMatchAllIndexes(matchArr){
-      if(!matchArr) return [];
+   getMatchAllIndexes(matches){
+      if(!matches) return [];
 
       let indexes = [];
-      for(const match of matchArr){
+      for(const match of matches){
          indexes.push(match.index);
       }
       return indexes;
@@ -1558,6 +1635,15 @@ const Tools = {
    },
 
 
+   /**
+    * get the current process time in milliseconds (nano-seconds precision)
+    *
+    * **this function requires JavaScript runtime environment**
+    */
+   getProcessTime(){
+      const hrt = process.hrtime();
+      return hrt[0] * 1000 + hrt[1] / 1000000;
+   },
 
    /**create Hyper link for terminal
     *
@@ -2532,7 +2618,7 @@ const Tools = {
     *
     * callback function should return an Object with `key` and `value` property
     * , undefined to delete the pair or **`null`** to keep the pair as is
-    * @template TVal, TKey
+    * @template TKey, TVal
     * @param {Map<TKey, TVal>|GenericObject<TVal>} obj object to map
     * @param {(key: TKey|string, value: TVal, obj: Map<TKey, TVal>|GenericObject<TVal>) => {key: any, value: any}|undefined|null} callback
     * Parameters:
@@ -4535,9 +4621,12 @@ const Tools = {
       if(typeof indent == 'number')
          indent = ''.padEnd(indent, ' ');
 
+      let indexOffset = 0;
       for(let eachLine of str.split('\n')){
+         const allIndex = Tools.getMatchAllIndexes(eachLine.matchAll(SoftSep_reg));
+
          while(Tools.ex_length(eachLine, redundancyLv) > maxLineLength){
-            const indexesOfSep = Tools.getMatchAllIndexes(eachLine.matchAll(SoftSep_reg))
+            const indexesOfSep = allIndex.map(v => v - indexOffset)
                .filter(v => v >= innerBound);
             let indexOfSep = indexesOfSep[0] ?? -1;
 
@@ -4553,6 +4642,7 @@ const Tools = {
                if(indexOfSep == -1){
                   const indexesOfHardSep = Tools.getMatchAllIndexes(eachLine.matchAll(HardSep_reg))
                      .filter(v => v >= innerBound);
+
                   indexOfSep = getSepIndex(indexesOfHardSep, 0) ?? maxLineLength;
                }else indexOfSep = getSepIndex(indexesOfSep, 0);
 
@@ -4561,6 +4651,7 @@ const Tools = {
 
             content += eachLine.substring(0, indexOfSep).concat('\n');
             eachLine = eachLine.substring(indexOfSep);
+            indexOffset += indexOfSep;
          }
 
          if(indent){

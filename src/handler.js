@@ -26,7 +26,9 @@ to._modules.fs = fs;
       DeviceTypes, DeviceTypesWithModifiers,
       BindingGroups,
       ParsedGameSettings,
-      AllRawSettings
+      AllRawSettings,
+      Modifiers,
+      OptionPatchOptionTypes
  * } from './editor.js'
  */
 
@@ -55,7 +57,7 @@ to._modules.fs = fs;
 class KeyBind {
    /**
     * key value
-    * @type {(Keys)|(Keys)[]}
+    * @type {(Keys)[]}
     */
    value = null;
    /**
@@ -85,19 +87,20 @@ class KeyBind {
     * @param {DeviceTypes|GameSettingPatch} typeRef
     */
    set(newValue, typeRef){
-      this.value = newValue;
+      if(typeof newValue === 'string') this.value = [newValue];
+      else this.value = newValue;
 
-      this.type = [this.#resolveType(typeRef)];
+      this.type = this.#resolveType(typeRef, newValue instanceof Array? newValue[0]: newValue);
    }
 
 
    /**
     * append a new key to the keybind
-    * @param {Keys|(Keys)[]} key
+    * @param {Keys|(Keys)[]} newValue
     * @param {DeviceTypes|GameSettingPatch} typeRef
     */
-   append(key, typeRef){
-      const currType = this.#resolveType(typeRef);
+   append(newValue, typeRef){
+      const currType = this.#resolveType(typeRef, newValue instanceof Array? newValue[0]: newValue);
 
       if(currType !== this.type){
          this.type = currType;
@@ -106,10 +109,10 @@ class KeyBind {
 
       if(!this.value) this.value = [];
 
-      if(key instanceof Array) this.value.push(...key);
+      if(newValue instanceof Array) this.value.push(...newValue);
       else {
-         if(this.value instanceof Array) this.value.push(key);
-         else this.value = [this.value, key];
+         if(this.value instanceof Array) this.value.push(newValue);
+         else this.value = [this.value, newValue];
       }
    }
 
@@ -151,7 +154,7 @@ class KeyBind {
 
       if(this.value instanceof Array){
          return ncc(color.gold)+`${_type} ${ncc(color.gray5)}${ncc(color.aquaPink)}${this.modifier.Ctrl?'Ctrl+':''}${this.modifier.Shift?'Shift+':''}${this.modifier.Alt?'Alt+':''}${this.modifier.Cmd?'⌘+':''}` +
-            this.value.map(v => `${(v?ncc(color.gray9)+v:ncc(color.gray6)+'[empty]')+ncc(color.gray7)}`).join(' + ');
+            this.value.map(v => `${(v?ncc(color.gray9)+v:ncc(color.gray6)+'[empty]')+ncc(color.gray7)}`).join('+');
       }
       return ncc(color.gold)+`${_type} ${ncc(color.gray5)}${ncc(color.aquaPink)}${this.modifier.Ctrl?'Ctrl+':''}${this.modifier.Shift?'Shift+':''}${this.modifier.Alt?'Alt+':''}${this.modifier.Cmd?'⌘+':''}${(this.value?ncc(color.gray9)+this.value:ncc(color.gray6)+'[empty]')+ncc(color.gray7)}`;
    }
@@ -159,20 +162,20 @@ class KeyBind {
    /**
     * resolve type of this keybind
     * @param {DeviceTypes|GameSettingPatch} typeRef
+    * @param {Keys} key
+    * @returns {DeviceTypes}
     */
-   #resolveType(typeRef){
+   #resolveType(typeRef, key){
       let _type = null;
 
       if(typeof typeRef !== 'string'){
          for(const device in typeRef.bindingsDeclaration){
             if(device === 'keyboard'||device === 'modifiers') continue;
 
-            if(typeRef.bindingsDeclaration[device][newValue] !== undefined){
+            if(typeRef.bindingsDeclaration[device][key] !== undefined){
                _type = device;
                break;
             }
-
-            if(_type) break;
          }
          if(!_type) return 'keyboard';
       }else{
@@ -196,6 +199,7 @@ class KeyBind {
          };
       }
 
+      // @ts-expect-error
       return _type;
    }
 
@@ -236,7 +240,7 @@ class AxisBind {
    set(newValue, typeRef){
       this.value = newValue;
 
-      this.type = this.#resolveType(typeRef);
+      this.type = this.#resolveType(typeRef, newValue);
    }
 
    /**
@@ -278,7 +282,7 @@ class AxisBind {
             this.type === 'mouse' ? '🖱️ Mouse' : (
                this.type === 'controller' ? '🎮 Cont.': ''));
 
-      if(this.value instanceof Array){
+      if(typeof this.value !== 'string'){
          throw new Error('AxisBind cannot have multiple values!');
       }
       return ncc(color.gold)+`${_type} ${ncc(color.gray5)}${ncc(color.aquaPink)}${this.scale * 100}% ${(this.value?ncc(color.gray9)+this.value:ncc(color.gray6)+'[empty]')+ncc(color.gray7)}`;
@@ -287,22 +291,20 @@ class AxisBind {
    /**
     * resolve the type of the keybind
     * @param {DeviceTypes|GameSettingPatch} typeRef
+    * @param {Axis} key
+    * @returns {DeviceTypes}
     */
-   #resolveType(typeRef){
+   #resolveType(typeRef, key){
       let _type = null;
 
       if(typeof typeRef !== 'string'){
          for(const device in typeRef.bindingsDeclaration){
             if(device === 'keyboard'||device === 'modifiers') continue;
 
-            for(const key in typeRef.bindingsDeclaration[device]){
-               if(typeRef.bindingsDeclaration[device][newValue] !== undefined){
-                  _type = device;
-                  break;
-               }
+            if(typeRef.bindingsDeclaration[device][key] !== undefined){
+               _type = device;
+               break;
             }
-
-            if(_type) break;
          }
          if(!_type) return 'keyboard';
       }else{
@@ -317,6 +319,7 @@ class AxisBind {
          }
       }
 
+      // @ts-expect-error
       return _type;
    }
 
@@ -367,7 +370,7 @@ async function readSQLite(filePath, settingSrc){
       filePath = path.resolve(config.gameInstalledPath, filePath);
 
    /**
-    * @type {sqlite3.Database}
+    * @type {any}
     */
    let db = null;
    let rawSettings = [];
@@ -379,7 +382,7 @@ async function readSQLite(filePath, settingSrc){
       });
 
       for(const group of settingSrc.manifest.acceptedGroups){
-         writeLog(`executing SQL: \`SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'\``, 4);
+         writeLog(`executing SQL: \`SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'\``);
 
          const result = await db.all(
             `SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'`
@@ -465,6 +468,7 @@ function parseIniKeyVal(rawSetting, settingKey, srcFile){
       return null;
    }
 
+   // @ts-expect-error return type is not the same as the function signature
    return parseValue(setting[settingKey]);
 
 
@@ -475,7 +479,7 @@ function parseIniKeyVal(rawSetting, settingKey, srcFile){
          case 'string':
             if(!value||value == 'null'||value == 'undefined')
                return {value: null, type: 'string', group };
-            return {value, type: 'string'};
+            return { value, type: 'string', group };
          case 'number':
             return { value, type: 'number', group };
          default:
@@ -486,9 +490,9 @@ function parseIniKeyVal(rawSetting, settingKey, srcFile){
 
 
 /**
+ * @param {string} settingScrPath FULL PATH to the setting source file
  * @param {SettingSrcMetadata} settingSrc
  * @param {Map<string, ParsedGameSettingObj>} settings
- * @param {string} settingScrPath FULL PATH to the setting source file
  */
 async function writeIniKeyVal(settingScrPath, settingSrc, settings){
    let noGroup = to.remap(Object.fromEntries(settings),
@@ -561,6 +565,7 @@ async function writeIniKeyVal(settingScrPath, settingSrc, settings){
       return;
    }
 
+   writeLog(`Writing IniKeyVal to "${settingScrPath}" with type "${settingSrc.type}"`);
    switch(settingSrc.type){
       case 'plainText':
          to.writeConfig(withGroup, settingScrPath, {
@@ -591,6 +596,11 @@ async function loadJSON(configPath, settingSrc) {
          settings['$null'] = JSON.parse(strSettings); // no group
          break;
       case 'sqlite':
+         if(typeof settingSrc.manifest.Reviver == 'string'){
+            writeLog('program not properly initialized: Reviver is not a function', 2);
+            return null;
+         }
+
          strSettings = await readSQLite(configPath, settingSrc);
          if(!strSettings) return null;
 
@@ -636,15 +646,22 @@ async function writeSQLite(filePath, settingSrc, settings){
       return false;
    }
 
+   if(typeof settingSrc.manifest.Replacer == 'string'){
+      writeLog('program not properly initialized: Replacer is not a function', 2);
+      return false;
+   }
+
    if(filePath.startsWith('.'))
       filePath = path.resolve(config.gameInstalledPath, filePath);
+
+   writeLog(`Writing to SQLite database "${filePath}"`);
 
    /**
     * Query:
     * `UPDATE LocalStorage SET value = $settingStr WHERE key == \'GameQualitySetting\'`
     */
    /**
-    * @type {sqlite3.Database}
+    * @type {any}
     */
    let db = null;
    try {
@@ -757,10 +774,15 @@ async function loadKBTupleMap(configPath, settingSrc) {
 
       if(!settings[currGroupName]) settings[currGroupName] = {};
 
-      if(!settings[currGroupName][thisKey]) settings[currGroupName][thisKey] = {};
+      if(!settings[currGroupName][thisKey]) settings[currGroupName][thisKey] = {
+         type: null,
+         values: []
+      };
       if(!settings[currGroupName][thisKey].values) settings[currGroupName][thisKey].values = [];
 
+      // @ts-expect-error
       settings[currGroupName][thisKey].type = type;
+      // @ts-expect-error
       settings[currGroupName][thisKey].values.push(thisSetting);
    }
 
@@ -789,7 +811,9 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
       return null;
    }
 
-   let values = [], type = null;
+   let values = [];
+   /**@type {OptionPatchOptionTypes} */
+   let type = null;
    if(setting[settingKey].type === 'AxisMappings'){
       type = 'axis';
 
@@ -816,7 +840,9 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
                   break;
                }
 
+               // @ts-expect-error we already filtered out the 'modifiers'
                binding.value = key;
+               // @ts-expect-error we already filtered out the 'modifiers'
                binding.type = deviceType;
                continue;
             }
@@ -826,7 +852,7 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
          values.push(binding);
       }
    }
-   else{
+   else {
       type = 'bindings';
       /**combineAction is stored separately in LocalStorage.db, here we combine them
        *  @type {string[][]|[]}
@@ -845,24 +871,33 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
          let binding = new KeyBind();
          let isAlternative = false; // for controller with alternative keybinds
 
-         for(let [feature, fValue] of Object.entries(eachKeybind)){
-            if(fValue instanceof Array){
-               binding.value = [];
-            }else fValue = [fValue];
+         // Raw data in src v
+         // ActionMappings=(ActionName="QTE交互",bShift=False,bCtrl=False,bAlt=False,bCmd=False,Key=Gamepad_FaceButton_Right)
 
-            for(let eachFValue of fValue){
+         // Parsed data in eachKeybind v
+         // feature: bShift, fValue: False
+         // feature: bAlt, fValue: False
+         // ...       (^ need key translation v)
+         // feature: Key, fValue: Gamepad_FaceButton_Right
+         for(let [feature, fValue] of Object.entries(eachKeybind)){
+            // @ts-expect-error
+            let valueList = fValue instanceof Array ? fValue : [fValue];
+
+            for(let eachFValue of valueList){
                const { key = null, deviceType = null } = getKeyFromBindingDeclaration(
-                  patch.bindingsDeclaration, eachFValue, ['modifiers']
+                  patch.bindingsDeclaration,
+                  feature !== 'Key'? feature: eachFValue
                );
 
-               if(feature === 'Key'){
+               if(feature === 'Key'&&deviceType !== 'modifiers'){
                   if(eachFValue.startsWith('GenericUSB')){
                      isAlternative = true;
                      break;
                   }
 
-                  if(binding.value instanceof Array) binding.value.push(key);
-                  else binding.value = key;
+                  // @ts-expect-error we already filtered out the Axis and modifiers type
+                  if(binding.value instanceof Array) binding.value.push(key); // @ts-expect-error
+                  else binding.value = [key];
                   binding.type = deviceType;
                   continue;
                }
@@ -878,7 +913,7 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
       }
    }
 
-
+   // @ts-expect-error incomplete return types is intentional
    return {
       value: values,
       type,
@@ -902,7 +937,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
    let combineActionMap = new Map();
 
    const mappedSettings = to.remap(parsed, (key, setting, currMap) => {
-      if(!(setting.type === 'bindings' || setting.type === 'axis')){
+      if(!(setting.type === 'bindings' || setting.type === 'axis')||!(setting.value instanceof Array)){
          writeLog(`invalid type "${setting.type}" for KBTupleMap`, 2);
          return;
       }
@@ -912,6 +947,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
       if(setting.type === 'bindings'){
          /**@type {KeyBind} */
          let binding;
+         // @ts-expect-error this should already be a type of KeyBind
          for(binding of setting.value){
             /**
              * @example
@@ -954,6 +990,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
       }else{
          /**@type {AxisBind} */
          let binding;
+         // @ts-expect-error this should already be a type of AxisBind
          for(binding of setting.value){
             const appDefKey = binding.value;
             /**
@@ -973,7 +1010,9 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
          }
       }
 
+      // @ts-expect-error currMap is a Map (same as input type)
       if(currMap.has(setting.group)){
+         // @ts-expect-error currMap is a Map (same as input type)
          currMap.get(setting.group).push({
             str: serialized,
             group: setting.group,
@@ -1024,6 +1063,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
    }
 
    let content = '';
+   // @ts-expect-error mappedSettings is a Map
    for(const [group, settings] of mappedSettings){
       content += `[${group}]\n`;
       content += settings.reduce((acc, curr) => acc + curr.str, '');
@@ -1047,7 +1087,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
  * @param {BindingGroups|BindingGroups[]} declarations either a(n) axisDeclaration or bindingsDeclaration
  * @param {string} value
  * @param {string[]} blacklist group name blacklist
- * @returns {{key: Keys|Axis, deviceType: DeviceTypesWithModifiers}}
+ * @returns {{key: Keys|Axis|Modifiers, deviceType: DeviceTypesWithModifiers}}
  */
 function getKeyFromBindingDeclaration(declarations, value, blacklist = []){
    if(!(declarations instanceof Array)) declarations = [declarations];
@@ -1057,20 +1097,24 @@ function getKeyFromBindingDeclaration(declarations, value, blacklist = []){
          if(blacklist.includes(deviceType)) continue;
 
          for(let [key, dValue] of Object.entries(declGroup[deviceType])){
+            // @ts-expect-error
             if(dValue instanceof Array){
                if(dValue.includes(value)){
+                  // @ts-expect-error
                   return {key, deviceType};
                }
                continue;
             }
 
             if(dValue === value){
+               // @ts-expect-error
                return {key, deviceType};
             }
          }
       }
    }
 
+   // @ts-expect-error
    return {key: value, deviceType: 'keyboard'};
 }
 

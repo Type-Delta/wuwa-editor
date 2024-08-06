@@ -1,9 +1,10 @@
 const exec = require('child_process').exec;
 const execProms = require('util').promisify(exec);
 const fs = require('fs');
-// @ts-expect-error can't find module
+
 const commandExists = require('command-exists');
 const path = require('path');
+const crypto = require('crypto');
 
 const to = require('./helper/Tools.js');
 const _global = require('./global.js');
@@ -151,7 +152,7 @@ function writeLog(message, level = 3, print = false) {
       case 0: message = ncc('Red')+ncc('Bright')+'[critical] ' + ncc() + message; break;
    }
 
-   if(print){
+   if(print&&!_global.disableTerminalLoggin){
       terminal.log(message);
    }
 
@@ -168,8 +169,6 @@ function writeLog(message, level = 3, print = false) {
       D.getMinutes().toString(),
       D.getSeconds().toString()
    ].map(t => t.padStart(2, '0'));
-
-
 
    const content = to.strWrap(message, 130, {
       firstIndent: `${time[0]+time[1]+time[2]}T${time[3]}:${time[4]}:${time[5]}| `,
@@ -217,6 +216,15 @@ function canBuildGetIPath() {
 }
 
 
+async function getFileHash(path, algorithm = config.fileDiffHash){
+   return new Promise((resolve, reject) => {
+      const hash = crypto.createHash(algorithm);
+      const rs = fs.createReadStream(path);
+      rs.on('error', reject);
+      rs.on('data', chunk => hash.update(chunk));
+      rs.on('end', () => resolve(hash.digest('hex')));
+  });
+}
 
 module.exports = {
    isProcessRunning,
@@ -228,5 +236,6 @@ module.exports = {
    closeLogFile,
    isModuleGetIPathExist,
    canBuildGetIPath,
-   resolveGameInstallPath
+   resolveGameInstallPath,
+   getFileHash
 }

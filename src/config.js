@@ -4,7 +4,7 @@ const { stringifyConfig, parseConfig, writeConfig } = require('./helper/Tools.js
 
 const CONFIG_PATH = './config.ini';
 const writeConfigOptions = {
-   ignoreList: ['loadConfig', 'writeConfig', 'logFilePath', 'backupFolder']
+   ignoreList: ['loadConfig', 'writeConfig', 'logFilePath', 'backupFolder', 'fileDiffHash']
 };
 const DEFAULT_CONFIG = `
 ###################   wuwa-editor Configuration   ###################
@@ -24,11 +24,12 @@ class Config {
    getInstalledFolderName = 'Wuthering Waves';
    patchJSONLocation = './patch.json';
    backupFolder = './backup';
-   maxBackup = 10;
+   maxBackup = 20;
    doBackup = true;
+   fileDiffHash = 'sha1';
 
    logFilePath = './wuwa-editor.log';
-   logFileMaxSizeMB =  5;
+   logFileMaxSizeMB =  1;
 
 
    constructor(){

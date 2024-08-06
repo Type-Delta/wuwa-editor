@@ -20,5 +20,6 @@ module.exports = {
    log: '',
    logFileWS: null,
    moduleGetIPathExist: null,
-   isThisProcessElevated: null
+   isThisProcessElevated: null,
+   disableTerminalLoggin: false,
 }
