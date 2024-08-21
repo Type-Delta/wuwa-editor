@@ -227,6 +227,13 @@
             "allowMultiple": true,
             "type": "bindings"
          },
+         "Jump":{
+            "description": "JUMP",
+            "key": "跳跃",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
          "Normal Attack": {
             "description": "Normal Attack",
             "key": "攻击",
@@ -311,20 +318,6 @@
             "allowMultiple": true,
             "type": "bindings"
          },
-         "Shop": {
-            "description": "Not in in-game settings and I can't get it to work. default key is 'I'",
-            "key": "商店",
-            "src": "inputSettings",
-            "allowMultiple": true,
-            "type": "bindings"
-         },
-         "Map": {
-            "description": "Open/Close Map menu",
-            "key": "地图",
-            "src": "inputSettings",
-            "allowMultiple": true,
-            "type": "bindings"
-         },
          "Ultimate": {
             "description": "Ultimate (Resonance Liberation)",
             "key": "大招",
@@ -346,6 +339,13 @@
             "allowMultiple": true,
             "type": "bindings"
          },
+         "Toggle Walk/Run":{
+            "description": "Switch between walk and run",
+            "key": "走跑切换",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
          "Show Utility Wheel": {
             "description": "Hold to show Utility wheel",
             "key": "幻象探索选择界面",
@@ -354,8 +354,71 @@
             "type": "bindings"
          },
          "Show Mouse": {
-            "description": "hold to show Mouse Cursor",
+            "description": "Hold to show Mouse Cursor",
             "key": "显示鼠标",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Quests":{
+            "description": "Open/Close Quests menu",
+            "key": "任务",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Quests Navigation":{
+            "description": "Show where/what you should do during quests",
+            "key": "任务追踪",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Shop": {
+            "description": "Not in in-game settings and I can't get it to work. default key is 'I'",
+            "key": "商店",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Map": {
+            "description": "Open/Close Map menu",
+            "key": "地图",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Formation":{
+            "description": "Open/Close team setup menu",
+            "key": "编队",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Inventory":{
+            "description": "Open/Close inventory",
+            "key": "背包",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Character Menu":{
+            "description": "Opem/Close character menu",
+            "key": "角色选择界面",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Mail":{
+            "description": "Open/Close mail menu",
+            "key": "邮件",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Chat":{
+            "description": "Open/Close chat",
+            "key": "聊天",
             "src": "inputSettings",
             "allowMultiple": true,
             "type": "bindings"
@@ -363,6 +426,27 @@
          "Event": {
             "description": "Open/Close Event menu",
             "key": "小活动",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Guidebook":{
+            "description": "Open Guidebook",
+            "key": "拾音辑录",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Quests Menu":{
+            "description": "Open Convene Banners",
+            "key": "调谐",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Battle Pass":{
+            "description": "Open/Close Battle Pass menu",
+            "key": "变星",
             "src": "inputSettings",
             "allowMultiple": true,
             "type": "bindings"
@@ -578,7 +662,7 @@
             "type": "bindings"
          },
          "UI Keyb. F - SpaceBar": {
-            "description": "Not sure what this does. default key is 'F' and 'Space'",
+            "description": "Not sure what this does. default key is 'F' and 'Space",
             "key": "UI键鼠F空格",
             "src": "inputSettings",
             "allowMultiple": true,
@@ -640,6 +724,27 @@
          "Abandon Challenge": {
             "description": "Press to exit time trial challenge",
             "key": "玩法放弃",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Interaction": {
+            "description": "Overworld Interaction",
+            "key": "通用交互",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Utility to Accessibility": {
+            "description": "Change utility wheel to accessibility wheel",
+            "key": "轮盘切换",
+            "src": "inputSettings",
+            "allowMultiple": true,
+            "type": "bindings"
+         },
+         "Attacking to Utillity": {
+            "description": "Changes the face button from attacking to utility functions ",
+            "key": "组合主键",
             "src": "inputSettings",
             "allowMultiple": true,
             "type": "bindings"
