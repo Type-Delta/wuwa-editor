@@ -13,7 +13,6 @@ const {
    search,
    ex_length,
    ncc,
-   redexOf,
    cleanString,
    strSlice,
    asyncSleep,

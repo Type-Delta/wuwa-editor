@@ -673,7 +673,7 @@ function drawSettingEditor(
 
                   hearderMsg = 'Choose input device type' + (setting.type == 'axis'? ' or modifier key': '');
                   rightPanelActive = false;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
+                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
                   break;
                case 4:  // 4. select control key/axis
                   leftPanelItems = Object.keys(patch[trackers.bindingInputTypePatchName][trackers.bindingDeviceTypePatchName]);
