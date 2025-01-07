@@ -1,14 +1,17 @@
 //////////// Tools ////////////
 /**# tools for Javascript
- * @version 2.12.12
+ * @version 2.12.13
  * for Node.js >= 16.x.x
  * @module Tools
  * @changes
+ * - optimize: IDGenerator()
+ * - fix: package (receive) disordered for IPC
+ * - add: JSComments Regex
+ * - update: IPC
  * - optimize: strWrap()
  * - add: class ConsoleTime
  * - fix: types error
  * - remove: modification of Object prototypes
- * - add: changeDateTimezone()
  *
  * DISCLAIMER: parts of this code are based on or copied (with slight modification) from other sources.
  * for license information, please refer to the respective sources.
@@ -251,6 +254,52 @@ class ParseArg_Arg {
 
    toString() {
       return this.value.toString();
+   }
+}
+
+
+class IPC_Listener {
+   /**
+    * @typedef {object} Package
+    * @property {string} channel - the channel this message was sent on
+    * @property {any[]} contents - the message contents
+    * @property {string} UPID - unique package ID, this id used to identify the package, more specifically used for `ask()` and `onAsk()` to make sure they receive the correct response
+    */
+   /**
+    * @type {0|1} listener type
+    * **0**: normal (`on()`)
+    * **1**: single use (`once()`)
+    */
+   type;
+   /**
+    * @type {string?} unique package ID, that this listener is waiting for
+    * if set: will only trigger when package with the same ID is received.
+    *
+    * **Note:** if UPID is set, the listener will become single-use regardless of type
+    */
+   UPID = null;
+   /**
+    * @type {(this: Package, ...any) => void | Promise<void>}
+    * callback function that when called will be binded to the package object
+    */
+   callback;
+   /**
+    * @param {0|1} type listener type
+    * **0**: normal (`on()`)
+    * **1**: single use (`once()`)
+    * @param {function(...any): void} callback
+    * @param {string?} [UPID=null] unique package ID, that this listener is waiting for
+    * if set: will only trigger when package with the same ID is received.
+    *
+    * **Note:** if UPID is set, the listener will become single-use regardless of type
+    */
+   constructor(type, callback, UPID = null){
+      if(UPID){
+         this.type = 1;
+         this.UPID = UPID;
+      }
+      else this.type = type;
+      this.callback = callback;
    }
 }
 
@@ -581,6 +630,38 @@ const Tools = {
       }
    },
 
+
+   /**
+    * call a function before the process exit
+    * usefull for cleaning up resources before the process exit
+    * @param {(eventType: 'exit'|'SIGINT'|'SIGUSR1'|'SIGUSR2'|'uncaughtException'|'SIGTERM', ...args: any) => void} callback callback function to call before exit
+    */
+   beforeExit(callback, preventImmediateExit = false){
+      if(preventImmediateExit)
+         process.stdin.resume();
+
+      let secondSigInt = false;
+      let secondSig = false;
+
+      [`exit`, `SIGINT`, `SIGUSR1`, `SIGUSR2`, `uncaughtException`, `SIGTERM`].forEach((eventType) => {
+         process.on(eventType, (...args) => {
+            if([`SIGINT`, `SIGUSR1`, `SIGUSR2`].includes(eventType)){
+               if(secondSigInt){
+                  console.log('Forcefully Exiting...');
+                  process.exit(1);
+               } else secondSigInt = true;
+            }
+
+            if(secondSig) return;
+            else secondSig = true;
+
+            callback(eventType, ...args);
+         });
+      });
+   },
+
+
+
    /**
     * change the timezone of the given date object
     * @param {Date} date
@@ -642,7 +723,7 @@ const Tools = {
 
 
    CheckCache: class CheckCache {
-      /**@type {null|boolean} */
+      /**@type {null|boolean|number} */
       static #supportsColor = null;
       /**@type {null|boolean} */
       static #supportsHyperlink = null;
@@ -663,7 +744,7 @@ const Tools = {
          return this.#supportsHyperlink;
       }
 
-      /**@param {null|boolean} value */
+      /**@param {null|boolean|number} value */
       static set supportsColor(value){
          this.#supportsColor = value;
       }
@@ -736,13 +817,20 @@ const Tools = {
       );
    },
 
+   /**
+    * clean Javascript style Comments from the given string
+    * @from [stackoverflow](https://stackoverflow.com/a/62945875)
+    */
+   cleanComments(str){
+      return str.replace(Tools.REGEXP.JSComments, (m, g) => g ? "" : m);
+   },
 
    /**
     * remove terminal controll code from the string (e.g. color, hyperlink)
-    * @param {string} string
+    * @param {string} str
     */
-   cleanString(string){
-      return string.normalize().replace(Tools.REGEXP.ANSICode, '');
+   cleanString(str){
+      return str.normalize().replace(Tools.REGEXP.ANSICode, '');
    },
 
 
@@ -1317,6 +1405,53 @@ const Tools = {
    },
 
 
+   /**
+    * ## **Create Deferred Function**
+    *
+    * create function that will only be called after
+    * not being called for a certain amount of time as specified by `delay`
+    *
+    * an example use case is when you want to call a function
+    * in an event listener that will be called multiple times a second
+    *
+    * @example
+    * const myPage = document.querySelector('.my-page');
+    * const deferredHeavyFunction = Tools.deferredFunc(() => {
+    *    // do something heavy
+    * }, 200);
+    *
+    * myPage.addEventListener('scroll', (ev) => {
+    *   deferredHeavyFunction(ev);
+    * }};
+    *
+    * @param {(...args: any) => void} callback function to call after the delay
+    * @param {number} [delay=200] delay in milliseconds
+    * @returns {(...args: any) => void} deferred function
+    */
+   deferredFunc(callback, delay = 200){
+      let lastCall = 0;
+      let interval = null;
+
+      return function(...args) {
+         if(!lastCall){
+            lastCall = Date.now();
+
+            interval = setInterval(() => {
+               if(Date.now() - lastCall > delay){
+                  callback(...args);
+
+                  if(interval){
+                     clearInterval(interval);
+                     interval = null;
+                  }
+                  lastCall = 0;
+               }
+            }, delay);
+         }
+         else lastCall = Date.now();
+      };
+   },
+
 
    /**return digit in the given index as Number
     * (index can be negative)
@@ -1445,7 +1580,7 @@ const Tools = {
       /**## an easier to customize Error object
        * @param {string|Error|unknown} message error message
        * @param {string} name error name
-       * @param {number} code error code
+       * @param {number|string} code error code
        * @param {string} stack error stacktrace
        */
       constructor(message, name = null, code = null, stack = null){
@@ -1676,43 +1811,46 @@ const Tools = {
     */
    IDGenerator(alreadyExistedIDs = null, pallet = 'CCNNNN'){
       let foundDub = false;
+      let palletLength = pallet.length;
       const st = new Tools.SafeTrue;
 
       while(st.True){
-         let id = '';
-         for(let i = 0; pallet.length > id.length; i++){
+         let id = new Array(palletLength);
+         for(let i = 0; i < palletLength; i++){
             switch (pallet[i]) {
-               case 'C':
-                  id += String.fromCharCode(
-                     Tools.getRandomInt(97, 122) - (32 * Tools.getRandomInt(0, 1))
-                  );
+               case 'C': {
+                  let code = Tools.getRandomInt(65, 116);
+                  if(code > 90) code += 6;
+
+                  id[i] = String.fromCharCode(code);
+               }
                continue;
 
                case 'N':
-                  id += Tools.getRandomInt(0, 9).toString();
+                  id[i] = Tools.getRandomInt(0, 9).toString();
                continue;
 
-               case 'B':
-                  if(Tools.getRandomInt(0, 1)){
-                     id += String.fromCharCode(
-                        Tools.getRandomInt(97, 122) - (32 * Tools.getRandomInt(0, 1))
-                     );
-                  }else id += Tools.getRandomInt(0, 9).toString();
+               case 'B': {
+                  let code = Tools.getRandomInt(48, 109);
+                  if(code > 57&&code < 84) code += 7;
+                  else if(code > 83) code += 13;
+
+                  id[i] = String.fromCharCode(code);
+               }
                continue;
 
                default:
-                  id += pallet[i];
+                  id[i] = pallet[i];
                break;
             }
          }
-
 
          if(alreadyExistedIDs){
             if(alreadyExistedIDs instanceof Set) foundDub = alreadyExistedIDs.has(id);
             else foundDub = alreadyExistedIDs.includes(id);
 
-            if(!foundDub) return id;
-         }else return id;
+            if(!foundDub) return id.join('');
+         }else return id.join('');
       };
       return null;
    },
@@ -1792,57 +1930,43 @@ const Tools = {
     *   ipc.send('mymsgchannel', 'work done!');
     * }
     */
-   IPC: class {
-      static Package = class Package {
-         channel;
-         content;
-      }
-      static Listener = class Listener {
-         /**
-          * @type {0|1} listener type
-          * **0**: normal (`on()`)
-          * **1**: single use (`once()`)
-          */
-         type;
-         /**
-          * @type {function(...any): void}
-          */
-         callback;
-         constructor(t, c){
-            this.type = t;
-            this.callback = c;
-         }
-      }
+   IPC: class IPC {
+      static Listener = IPC_Listener;
 
       /**dgram Socket or Worker object
        */
       #socket
-      /**
-       * @typedef {object} Listener
-       * @property {0|1} type - listener type
-       * **0**: normal (`on()`)
-       * **1**: single use (`once()`)
-       * @property {function(...any): void} callback
-       */
       /**message listeners for each channel
-       * @type {Map<string, Listener[]>} pair **channel** - **callback function**
+       * @type {Map<string, IPC_Listener[]>} pair **channel** - **callback function**
        */
       #listeners = new Map;
       #proto;
-      #tagetAdd = 'localhost';
+      #defaultTimeout = 1000;
+      #isBinded = false;
+      #UPIDsSet = new Set;
+      peersAddress = 'localhost';
+      peersPort;
       /**the port this IPC is on or Worker object if using `nodeworker`
        * @type {number|Worker|@require('worker_threads').parentPort}
        */
-      port;
+      listenPort;
       get protocol(){ return this.#proto; };
 
+
+      /**
+       * @typedef {object} IPCOptions
+       * @property {number} [peersPort] default port when sending message
+       * @property {string} [peersAddress] default address when sending message
+       * @property {number|Worker} [listenPort] default port when listening for message
+       * @property {number} [timeout] default timeout for waiting for response
+       */
       // LINK: dn4kas
       /**## Inter-process Communication
        * IPC which is capable of tranfering most standard Javascript Objects
        *
        * ### Important! this class may requires *`dgram`* or *`worker_threads`* (NodeJS module) that will be imported upon calling
        * @param {'nodeworker'|'udp4'|'udp6'} protocol **data transfer protocol** **`nodeworker`** using the build-in NodeJS `worker_threads` module, **`udp4`** or **`udp6`** using the build-in NodeJS `dgram` module
-       * @param {number|Worker|require('worker_threads').parentPort} port port to listen on (if `protocol` is `nodeworker` this will be the `worker` or `parentPort` object)
+       * @param {Worker|IPCOptions} settings IPC options (if `protocol` is `nodeworker` this will be the `worker` or `parentPort` object)
        * if `protocol` is `nodeworker` this argument can be omitted and will create a connection to the main thread if has any.
        * @example
        * // using the dgram module
@@ -1876,8 +2000,15 @@ const Tools = {
        *   ipc.send('mymsgchannel', 'work done!');
        * }
        */
-      constructor(protocol = 'udp4', port = null){
+      constructor(protocol = 'udp4', settings = {}){
          if(!onJSRuntime) throw new Error('IPC is only available on JSRuntime, due to the use of Node modules');
+
+         const {
+            peersPort = null,
+            peersAddress = null,
+            listenPort = null,
+            timeout = 1000
+         } = (typeof settings == 'number'? { listenPort: settings }: settings); // <- for backward compatibility
 
          if(protocol != 'nodeworker'&&protocol != 'udp4'&&protocol != 'udp6')
             throw new Error(`protocol must be 'nodeworker', 'udp4' or 'udp6' instead given '${protocol}'`);
@@ -1892,12 +2023,7 @@ const Tools = {
                throw new Error(`module 'worker_threads' not loaded use 'Tools._modules.worker_threads = require("worker_threads")' to load it`);
             }
 
-            if(
-               !(port instanceof Tools._modules.worker_threads.Worker)&&
-               port !== Tools._modules.worker_threads.parentPort&&
-               port != null
-            ) throw new Error(`port must be a type of 'Worker' or a 'parentPort' instead given '${typeof port}'`);
-            if(!port){
+            if(!listenPort){
                if(Tools._modules.worker_threads.isMainThread)
                   throw new Error('when using `nodeworker` protocol, `port` must be provided if on the main thread');
                this.#socket = Tools._modules.worker_threads.parentPort;
@@ -1905,12 +2031,23 @@ const Tools = {
                return;
             }
 
-            this.#socket = port;
+            if(
+               !(listenPort instanceof Tools._modules.worker_threads.Worker)&&
+               listenPort !== Tools._modules.worker_threads.parentPort&&
+               listenPort != null
+            ) throw new Error(`port must be a type of 'Worker' or a 'parentPort' instead given '${typeof listenPort}'`);
+
+            this.#socket = listenPort;
             this.#init();
             return;
          }
 
-         this.port = port;
+         if(!peersPort) throw new Error('peersPort must be provided for `udp4` or `udp6` protocol');
+
+         this.#defaultTimeout = timeout;
+         this.listenPort = listenPort;
+         this.peersAddress = peersAddress;
+         this.peersPort = peersPort;
          this.#socket = Tools._modules.dgram.createSocket(protocol);
          this.#init();
       }
@@ -1919,15 +2056,26 @@ const Tools = {
        * @returns {Promise<number|void>} port number if `protocol` is `udp4` or `udp6`
        */
       async #init(){
-         return new Promise(resolve => {
-            this.#socket.on('message', this.#handleIncomePackage);
+         this.#socket.on('message', this.#handleIncomePackage);
 
-            if(this.protocol == 'nodeworker') resolve();
+         if(this.protocol == 'nodeworker') return;
+         if(!this.listenPort) return;
 
-            this.#socket.bind(this.port, port => {
-               resolve(this.port = port);
-            });
-         });
+         try {
+            this.#socket.bind(this.listenPort);
+            this.#isBinded = true;
+
+         } catch(err) {
+            switch(err.code){
+               case 'ERR_SOCKET_BAD_PORT':
+                  throw new Tools.Err(`Tools.IPC: port ${this.listenPort} is not valid`, 'IPC_ERR_SOCKET_BAD_PORT', err.code, err.stack);
+               case 'EADDRINUSE':
+                  throw new Tools.Err(`Tools.IPC: port ${this.listenPort} is already in use`, 'IPC_EADDRINUSE', err.code, err.stack);
+               default:
+                  throw Tools.Err.from(err, 'IPC_BIND_ERROR')
+                     .message = `Tools.IPC: failed to bind port ${this.listenPort} ` + err.message;
+            }
+         }
       }
 
       /**bind sender to a specific address
@@ -1935,9 +2083,13 @@ const Tools = {
        * this allows message to be sent across devices
        * @param {string} address IPv4 address separated by dots
        */
-      bind(address){
+      bind(address, port){
          if(this.protocol == 'nodeworker') return;
-         this.#tagetAdd = address;
+         this.peersAddress = address;
+         this.listenPort = port;
+
+         if(!this.#isBinded) this.#init();
+         return this;
       }
 
 
@@ -1946,39 +2098,54 @@ const Tools = {
          this.#socket.close();
       }
 
-      /**send masssage to the other end
+      /**
+       * @typedef {object} advSendOptions
+       * @property {any[]|any} contents contents (massages) to send, can be any standard Javascript objects
+       * @property {string} [UPID] Unique Package ID, if provided, the receiver will only receive this package once
+       */
+      /**## send masssage to the other end (Advanced)
+       *
+       * advanced version of `send()` that allows more control over how the message is sent
        *
        * @param {string} channel channel to send this message to
        * (if the receiver end didn't listen for this channel they won't see this masssage)
-       * @param {...*} contents contents (massages) to send, can be any standard Javascript objects
+       * @param {advSendOptions} options
        * @returns {Promise<void>}
        */
-      async send(channel, ...contents){
+      async advSend(channel, options){
          return new Promise((resolve, reject) => {
             if(!channel) throw new Error('channel must be provided');
             if(typeof channel != 'string')
                throw new Error(`channel must be a type of 'string' instead given '${typeof channel}'`);
 
+            let { contents, UPID } = options;
 
-            const _package = this.protocol == 'nodeworker'? {
-               channel,
-               contents: contents.map(c => {
-                  if(isWorkerTransferable(c)) return c;
-                  return '@JSON:' + JSON.stringify(c, Tools.JSONReplacer);
-               })
-            }: Buffer.from(
-               JSON.stringify({
+            if(!(contents instanceof Array)) contents = [contents];
+
+            /**@type {Package} */
+            let _package;
+            try {
+               _package = this.protocol == 'nodeworker'? {
                   channel,
-                  contents
-               }, Tools.JSONReplacer)
-            );
+                  UPID,
+                  contents: contents.map(c => {
+                     if(isWorkerTransferable(c)) return c;
+                     return '@JSON:' + JSON.stringify(c, Tools.JSONReplacer);
+                  })
+               }: Buffer.from(
+                  JSON.stringify({
+                     channel,
+                     UPID,
+                     contents
+                  }, Tools.JSONReplacer)
+               );
+            } catch(err) {
+               reject(Tools.Err.from(err, 'IPC_SERIALIZE_ERROR')
+                  .message = `Tools.IPC: failed to serialize payload,` + err.message
+               );
+               return;
+            }
 
-            // const _package = Buffer.from(
-            //    JSON.stringify({
-            //       channel,
-            //       contents
-            //    }, Tools.JSONReplacer)
-            // );
 
             if(this.protocol == 'nodeworker'){
                this.#socket.postMessage(_package);
@@ -1986,11 +2153,22 @@ const Tools = {
                return;
             }
 
-            this.#socket.send(_package, this.port, this.#tagetAdd, (err, bytes) => {
+            this.#socket.send(_package, this.peersPort, this.peersAddress, (err, bytes) => {
                if(err) reject(err);
                resolve();
             });
          });
+      }
+
+      /**## send masssage to the other end (Simple)
+       *
+       * @param {string} channel channel to send this message to
+       * (if the receiver end didn't listen for this channel they won't see this masssage)
+       * @param {...*} contents contents (massages) to send, can be any standard Javascript objects
+       * @returns {Promise<void>}
+       */
+      async send(channel, ...contents){
+         return this.advSend(channel, { contents });
       }
 
       /**listen on the given channel for messages
@@ -2002,14 +2180,15 @@ const Tools = {
          let listener = this.#listeners.get(channel);
          if(!listener){
             this.#listeners.set(channel, [
-               new Tools.IPC.Listener(0, callback)
+               new IPC_Listener(0, callback)
             ]);
             return;
          }
 
          listener.push(
-            new Tools.IPC.Listener(0, callback)
+            new IPC_Listener(0, callback)
          );
+         return this;
       }
 
       /**listen on the given channel for messages
@@ -2018,19 +2197,21 @@ const Tools = {
        * @param {string} channel channel to send this message to
        * (if the receiver end didn't listen for this channel they won't see this masssage)
        * @param {function(...any): void} callback callback when the massage for this channel is received
+       * @param {string} [UPID] Unique Package ID, if provided, the receiver will only receive this package once
        */
-      once(channel, callback){
+      once(channel, callback, UPID = null){
          let listener = this.#listeners.get(channel);
          if(!listener){
             this.#listeners.set(channel, [
-               new Tools.IPC.Listener(1, callback)
+               new IPC_Listener(1, callback, UPID)
             ]);
             return;
          }
 
          listener.push(
-            new Tools.IPC.Listener(1, callback)
+            new IPC_Listener(1, callback, UPID)
          );
+         return this;
       }
 
       /**
@@ -2086,12 +2267,17 @@ const Tools = {
                }, timeout);
             }
 
+            const upid = this.#createUPID(); // (sender side) add UPID before sending
+
             this.once(channel, res => {
                if(timeout) clearTimeout(transmitTimeout);
                resolve(res);
-            });
+            }, upid);
 
-            this.send(channel, ...contents);
+            this.advSend(channel, {
+               contents,
+               UPID: upid
+            });
          });
       }
 
@@ -2105,19 +2291,24 @@ const Tools = {
        * @param {function(...any): any|function(...any): Promise<any>} callback callback when the massage for this channel is received
        */
       onAsk(channel, callback) {
-         const handleAsk = async (...args) => {
+         const self = this;
+         const handleAsk = async function (...args) {
+            self.#UPIDsSet.add(this.UPID); // (receiver side) add UPID before response
+
             const res = await callback(...args);
-            this.send(channel, res);
+            self.advSend(channel, {
+               contents: [res],
+               UPID: this.UPID
+            });
+
+            self.#UPIDsSet.delete(this.UPID); // (receiver side) remove UPID after response
          }
 
          this.on(channel, handleAsk);
+         return this;
       }
 
-      /**
-       * @typedef {object} Package
-       * @property {string} channel - the channel this message was sent on
-       * @property {any[]} contents - the message contents
-       */
+
       /**
        * @param {Buffer|Package} rawPackage
        * @returns {void}
@@ -2126,24 +2317,42 @@ const Tools = {
          /**
           * @type {Package}
           */
-         const _package = this.protocol == 'nodeworker'?
-            {
-               channel: rawPackage.channel,
-               contents: rawPackage.contents.map(c => {
-                  if(typeof c == 'string'&&c.startsWith('@JSON:'))
-                     return JSON.parse(c.slice(6), Tools.JSONReviver);
-                  return c;
-               })
-            }:
-            JSON.parse(rawPackage.toString(), Tools.JSONReviver);
+         let _package;
+         try {
+            _package = this.protocol == 'nodeworker'
+               ? {
+                  channel: rawPackage.channel,
+                  UPID: rawPackage.UPID,
+                  contents: rawPackage.contents.map(c => {
+                     if(typeof c == 'string'&&c.startsWith('@JSON:'))
+                        return JSON.parse(c.slice(6), Tools.JSONReviver);
+                     return c;
+                  })
+               }
+               : JSON.parse(rawPackage.toString(), Tools.JSONReviver);
+         } catch(err){
+            throw Tools.Err.from(err, 'IPC_DESERIALIZE_ERROR')
+               .message = `Tools.IPC: failed to deserialize payload,` + err.message;
+         }
 
          let listener = this.#listeners.get(_package.channel);
          if(!listener) return;
 
          for(const lis of listener){
-            lis.callback(..._package.contents);
-            if(lis.type == 1) this.remove(lis.callback);
+            if(lis.UPID){
+               if(lis.UPID != _package.UPID) continue;
+               this.#UPIDsSet.delete(lis.UPID); // (sender side) remove UPID after received response
+            }
+
+            lis.callback.call(_package, ..._package.contents);
+            if(lis.type == 1||lis.UPID) this.remove(lis.callback);
          }
+      }
+
+      #createUPID(){
+         let UPID = Tools.IDGenerator(this.#UPIDsSet, 'BBBBBBBB');
+         this.#UPIDsSet.add(UPID);
+         return UPID;
       }
    },
 
@@ -2306,19 +2515,6 @@ const Tools = {
     * //  }
     */
    JSONReplacer(key, value) {
-      switch(typeof value){
-         case 'function':
-            return {
-               '@dataType': 'function',
-               '@value': value.toString().replace(/\n* {2,}|\n/g, ''),
-            }
-         case 'bigint':
-            return {
-               '@dataType': 'BigInt',
-               '@value': value.toString(),
-            };
-      }
-
       if(value instanceof Map){
          return {
             '@dataType': 'Map',
@@ -2331,6 +2527,30 @@ const Tools = {
             '@dataType': 'Set',
             '@value': Array.from(value.values()),
          };
+      }
+
+      switch(typeof value){
+         case 'function':
+            return {
+               '@dataType': 'function',
+               '@value': value.toString().replace(/\n* {2,}|\n/g, ''),
+            }
+         case 'bigint':
+            return {
+               '@dataType': 'BigInt',
+               '@value': value.toString(),
+            };
+         case 'object':
+            for(const key in value){
+               // Date will be stringified before hand if accessed directly from `value`
+               if(value[key] instanceof Date){
+                  value[key] = {
+                     '@dataType': 'Date',
+                     '@value': value[key].valueOf(),
+                  };
+               }
+            }
+            return value;
       }
 
       return value;
@@ -2374,6 +2594,8 @@ const Tools = {
             return new Map(value['@value']);
          case 'Set':
             return new Set(value['@value']);
+         case 'Date':
+            return new Date(value['@value']);
       }
 
       return value;
@@ -2654,10 +2876,14 @@ const Tools = {
          const modValue = callback(key, obj[key], newObj);
 
          if(modValue === undefined) continue;
-         if(modValue === null) newObj[key] = obj[key];
+         if(modValue === null){
+            newObj[key] = obj[key];
+            continue;
+         }
 
          if(modValue.key === undefined){
             newObj[key] = modValue;
+            continue;
          }
 
          newObj[modValue.key] = modValue.value;
@@ -2974,6 +3200,7 @@ const Tools = {
        * @requires {number} mapped number
        */
       map(x, Xmin, Xmax, Tmin, Tmax){
+         x = Tools.MathKit.clamp(x, Xmin, Xmax);
          return (x - Xmin) / (Xmax - Xmin) * (Tmax - Tmin) + Tmin;
       },
 
@@ -3084,7 +3311,7 @@ const Tools = {
 
 
    /**
-    * @typedef {'Reset'|'Bright'|'Dim'|'Italic'|'Blink'|'Invert'|'Hidden'|'Black'|'Red'|'Green'|'Yellow'|'Blue'|'Magenta'|'Cyan'|'White'|'BgBlack'|'BgRed'|'BgGreen'|'BgYellow'|'BgBlue'|'BgMagenta'|'BgCyan'|'BgWhite'|number|string} NCCColorOptions
+    * @typedef {'Reset'|'Bright'|'Dim'|'Italic'|'Blink'|'Invert'|'Hidden'|'Black'|'Red'|'Green'|'Yellow'|'Blue'|'Magenta'|'Cyan'|'White'|'BgBlack'|'BgRed'|'BgGreen'|'BgYellow'|'BgBlue'|'BgMagenta'|'BgCyan'|'BgWhite'|number} NCCColorOptions
     */
    /**(**Node Console Color**) return the Node.js Console Text formats, use this format to change
     * how Console Text looks.
@@ -3120,7 +3347,7 @@ const Tools = {
       // using custom 24 bit color, see: https://en.wikipedia.org/wiki/ANSI_escape_code#24-bit
       if(typeof color == 'number'){
          const rgb = Tools.Convert.decimalColorToRGB(color);
-         if(force8Bit === null) force8Bit = (Tools.CheckCache.supportsColor == 0);
+         if(force8Bit === null) force8Bit = (Tools.CheckCache.supportsColor <= 1);
 
          if(!force8Bit){
             // \x1b[<3|4>8;2;<r>;<g>;<b>m
@@ -3467,9 +3694,9 @@ const Tools = {
 
    /**parse configuration file in UTF-8 encoding to a Javascript Object
     * @param {string}ConfigString configuration file content
-    * @param {function(this: any, string, any): any} [JSONReviver=null] JSON reviver function, to parse JSON Object in side the config file
+    * @param {(function(this: any, string, any): any)|null} [JSONReviver=null] JSON reviver function, to parse JSON Object in side the config file
     * @param {{ignoreGroups?: boolean}} [options]
-    * @returns {object} configuration in Javascript Object
+    * @returns {any} configuration in Javascript Object
     * @example //in main file
     * const fs = require('fs');
     *
@@ -3503,10 +3730,9 @@ const Tools = {
 
       let rows = Tools.cleanArr(ConfigString.trim().split('\n'), ['', '\s', '\r']);
       let configObj = {};
-      let indexOfSBeforeQ = 0;
       let activeGroup = null;
 
-      let json_str = '', jsonVar_key;
+      let json_str = '', jsonVar_key, jsonLayer = 0;
       let inJson = false;
       for(let rowIndex = 0; rowIndex < rows.length; rowIndex++){
          /**| row00
@@ -3538,6 +3764,23 @@ const Tools = {
             }
          }
 
+
+         // Parse JSON config
+         if(inJson){
+            json_str += rows[rowIndex];
+
+            // continue to next row if this row isn't the end of JSON config
+            if(!jsonEnd(rowIndex, rows)) continue;
+
+            inJson = false;
+            if(activeGroup)
+               configObj[activeGroup][jsonVar_key] = JSON.parse(json_str, JSONReviver);
+            else
+               configObj[jsonVar_key] = JSON.parse(json_str, JSONReviver);
+            continue;
+         }
+
+
          // | pair00 = pair01
          /**@type {string[]} */
          let eachPair = Tools.cleanArr(eachRow.split('='));
@@ -3553,40 +3796,8 @@ const Tools = {
          }
 
 
-
-
-         // Parse JSON config
-         if(inJson){
-            if(jsonEnd(rowIndex, rows)){
-               inJson = false;
-               if(activeGroup)
-                  configObj[activeGroup][jsonVar_key] = JSON.parse(json_str, JSONReviver);
-               else
-                  configObj[jsonVar_key] = JSON.parse(json_str, JSONReviver);
-            }else{
-               json_str += rows[rowIndex];
-               continue;
-            }
-         }
-
-
-
          // Parse Normal config
          eachPair = [eachPair[0].trim(), eachPair[1].trim()];
-
-         if(/^[\[\{]/.test(eachPair[1])){
-            inJson = true;
-            [jsonVar_key, json_str] = eachPair;
-         }
-
-         // check for invalid key
-         if(eachPair[0].search(/[0-9]/) == 0)
-            throw new Error(`Tools.parseConfig(): Key cannot starts with Numbers. at \`${eachRow}\``);
-
-         {
-            const invalidChar = eachPair[0].replace(/[a-z$_0-9.]/ig, '');
-            if(invalidChar.length !== 0) throw new Error(`Tools.parseConfig(): these character(s) "${invalidChar}" can not be Parse. at \`${eachRow}\``);
-         }
 
 
          // try to parse value
@@ -3627,18 +3838,45 @@ const Tools = {
             eachPair[1] = eachPair[1].slice(firstQ+1, secQ);
 
          }else if(firstS != -1){
-            eachPair[1] = eachPair[1].substring(
-               0, eachPair[1].indexOf('#', indexOfSBeforeQ)
+            eachPair[1] = eachPair[1].slice(
+               0, eachPair[1].indexOf('#')
             ).trim();
 
             if(!eachPair[1]) throw new Error(`Tools.parseConfig(): invalid syntax, expected expresion after '='.  at \`${eachRow}\``);
          }
 
+
+
+         // check for invalid key
+         if(/^[0-9]/.test(eachPair[0]))
+            throw new Error(`Tools.parseConfig(): Key cannot starts with Numbers. at \`${eachRow}\``);
+
+         {
+            const invalidChar = eachPair[0].replace(/[a-z$_0-9.]/ig, '');
+            if(invalidChar.length !== 0) throw new Error(`Tools.parseConfig(): these character(s) "${invalidChar}" can not be Parse. at \`${eachRow}\``);
+         }
+
+         if(/^[\[\{]/.test(eachPair[1])){
+            jsonLayer = 0;
+            [jsonVar_key, json_str] = eachPair;
+
+            if(jsonEnd(1, eachPair)){ // one line JSON config
+               if(activeGroup)
+                  configObj[activeGroup][jsonVar_key] = JSON.parse(json_str, JSONReviver);
+               else
+                  configObj[jsonVar_key] = JSON.parse(json_str, JSONReviver);
+               continue;
+            }
+
+            inJson = true;
+            continue;
+         }
+
          // if value isn't wrapped in quotes: try to parse it
          if(activeGroup)
-            configObj[activeGroup][eachPair[0]] = valueWrappedInQ? eachPair[1]: parseValue(eachPair[1]);
+            configObj[activeGroup][eachPair[0]] = valueWrappedInQ? eachPair[1]: Tools.parseValue(eachPair[1]);
          else
-            configObj[eachPair[0]] = valueWrappedInQ? eachPair[1]: parseValue(eachPair[1]);
+            configObj[eachPair[0]] = valueWrappedInQ? eachPair[1]: Tools.parseValue(eachPair[1]);
       }
 
       return configObj;
@@ -3650,36 +3888,33 @@ const Tools = {
        * @returns {boolean} true if the given row is the end of JSON config
        */
       function jsonEnd(i, rows) {
-         if(i == rows.length - 1) return true;
-         const b_closeIndexes = Tools.getMatchAllIndexes(rows[i].matchAll(/[}]]/g));
+         jsonLayer += [...rows[i].matchAll(Tools.REGEXP.OpenSCBrackets)]
+            .filter(m => m[1]).length;
 
-         for(const eachIndex of b_closeIndexes){
-            const testBrack = rows[i].includes('}')? '}' :(rows[i].includes(']')? ']': false);
+         jsonLayer -= [...rows[i].matchAll(Tools.REGEXP.CloseSCBrackets)]
+            .filter(m => m[1]).length;
 
-            if(
-               testBrack&&
-               !Tools.surroundedBy('"', rows[i].lastIndexOf(testBrack), rows[i])&&
-               !rows[i].slice(eachIndex).trim().startsWith(',')
-            ) return true;
-         }
-
-         return (
-            rows[i].includes('=') &&
-            !Tools.surroundedBy('"', rows[i].lastIndexOf('='), rows[i])
-         );
+         if(jsonLayer <= 0) return true;
+         return false;
       };
+   },
 
-      function parseValue(strValue){
-         switch (strValue.toLowerCase()) {
-            case 'true': return true;
-            case 'false': return false;
-            case 'null': return null;
-            case '':
-            case 'undefined': return undefined;
-            default:
-               if(!isNaN(strValue)) return Number(strValue);
-               return strValue;
-         }
+   /**
+    * parse value in string to its actual data type
+    * @param {string} strValue value in string
+    */
+   parseValue(strValue){
+      if(typeof strValue != 'string') return strValue;
+
+      switch (strValue.toLowerCase()) {
+         case 'true': return true;
+         case 'false': return false;
+         case 'null': return null;
+         case '':
+         case 'undefined': return undefined;
+         default:
+            if(!isNaN(strValue)) return Number(strValue);
+            return strValue;
       }
    },
 
@@ -3918,7 +4153,7 @@ const Tools = {
        * match any ANSI code
        *
        * if hyperlinks are found, will only match beginning and the end of a hyperlink escape sequence,
-       * along with the Lable but kept the URL untouched.
+       * along with the Label but kept the URL untouched.
        */
       ANSICode: /\x1b\[\d{1,3}(?:;\d{1,3})*m|\x1b\]8;;|(?<=[^\x07]+)\x07[^\x07]+\]8;;\x07/g,
       /**
@@ -3946,7 +4181,37 @@ const Tools = {
        */
       EmojiEachGroup: new RegExp("(?:" + EMOJI_MATCHER_TOKEN + ")+", 'g'),
 
-      IniGroups: /^[\t ]*\[(.+)\][\t ]*$/gm
+      IniGroups: /^[\t ]*\[(.+)\][\t ]*$/gm,
+      /**
+       * match all JS style comments
+       *
+       * the valid match are in the first capture group, for example, to match the comments:
+       * @example
+       * [...str.matchAll(REGEXP.JSComments)].filter(m => m[1])
+       *
+       * // filter out only matches with a capture group
+       */
+      JSComments: /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g,
+      /**
+       * match any **Open Square** or **Curly Brackets** that are not inside a string
+       *
+       * the valid match are in the first capture group, for example, to match the Open Square or Curly Brackets:
+       * @example
+       * [...str.matchAll(REGEXP.OpenSCBrackets)].filter(m => m[1])
+       *
+       * // filter out only matches with a capture group
+       */
+      OpenSCBrackets: /\\"|"(?:\\"|[^"])*"|([\[\{])/g,
+      /**
+       * match any **Close Square** or **Curly Brackets** that are not inside a string
+       *
+       * the valid match are in the first capture group, for example, to match the Close Square or Curly Brackets:
+       * @example
+       * [...str.matchAll(REGEXP.OpenSCBrackets)].filter(m => m[1])
+       *
+       * // filter out only matches with a capture group
+       */
+      CloseSCBrackets: /\\"|"(?:\\"|[^"])*"|([\]\}])/g,
    }),
 
    /**
