@@ -173,7 +173,7 @@ say we want to change the a binding to keyboard `Ctrl+F+E`, here is how you do i
 2. [page2] select `keyboard` as the device type.
 3. [page3] press `Ctrl+G` to enter key recording mode, then press `F`
 4. [page3] press `Ctrl+G` again, then press `E`
-5. [page3] we still missing a `Ctrl` modifier, let's go back to step 2 by pressing `Esc`
+5. [page3] we still missing a `Ctrl` modifier, let's go back to page 2 by pressing `Esc`
 6. [page2] now select `modifier` as the device type.
 7. [page3] and select `Ctrl` as a modifier key.
 8. [page3] press `Ctrl+Enter` to apply the binding. (done)
