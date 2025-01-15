@@ -537,6 +537,21 @@ module.exports = class Terminal {
    }
 
 
+   /**
+    * Wrapper for `terminal.on('key')`, this function works similar to C's `getch()`
+    * @param {boolean} [preventDefault=true] whether to prevent the default action of the key
+    */
+   async getch(preventDefault = true){
+      return new Promise((resolve) => {
+         const waitForInput = (key) => {
+            this.#events.removeListener('key', waitForInput);
+            resolve(key);
+            return preventDefault;
+         };
+
+         this.on('key', waitForInput);
+      });
+   }
 
 
    /**rewrite the current line and clear suggestion text

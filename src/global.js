@@ -13,7 +13,7 @@ module.exports = {
       aquaPink: 0xd149b1,
       gold: 0xc19c00
    }),
-   version: '1.0.0',
+   version: '1.1.0',
    tracer: null,
    deviceTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
    deviceTempFolder: process.env.TEMP || process.env.TMP || '/tmp' || './tmp',

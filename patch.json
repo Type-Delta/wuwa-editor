@@ -1,8 +1,8 @@
 {
    "$schema": "./resources/patchSchema.json",
-   "gameVersion": "1.0.2",
-   "patchVersion": 1,
-   "handlerVersion": 1,
+   "gameVersion": "2.0.2",
+   "patchVersion": 2,
+   "handlerVersion": 2,
    "configSrcMap": {
       "inputSettings": {
          "displayName": "Controls",
@@ -26,11 +26,13 @@
          "description": "Configure advance graphics and other game settings",
          "path": "./Wuthering Waves Game/Client/Saved/LocalStorage/LocalStorage.db",
          "type": "sqlite",
-         "dataType": "JSON",
+         "dataType": "literal",
          "manifest": {
-            "acceptedGroups": [
-               "GameQualitySetting"
-            ],
+            "acceptedGroups": [],
+            "filter": "$sql:value not like '[%' and value not like '{%'",
+            "readMapper": "$func:value = value === '\"___0B___\"'? false : (value === '\"___1B___\"'? true : value);if(['RayTracing','NvidiaSuperSamplingEnable','NvidiaReflex','MetalFxEnable','FsrEnable','XessEnable'].includes(key)) value = !!parseInt(value, 10);",
+            "writeMapper": "$func:if(['RayTracing','NvidiaSuperSamplingEnable','NvidiaReflex','MetalFxEnable','FsrEnable','XessEnable'].includes(key)) value = value? 1 : 0;value = value === false? '\"___0B___\"' : (value === true? '\"___1B___\"' : value);",
+            "literalTypeParsing": true,
             "selectedTable": "LocalStorage"
          }
       },
@@ -78,46 +80,26 @@
             },
             "default": 1
          },
-         "Window Resolution Width": {
-            "description": "Set window WIDTH (when display mode is Windowed)",
-            "key": "KeyPcResolutionWidth",
-            "src": "advanceSettings",
-            "type": "number"
-         },
-         "Window Resolution Height": {
-            "description": "Set window HEIGHT (when display mode is Windowed)",
-            "key": "KeyPcResolutionHeight",
-            "src": "advanceSettings",
-            "type": "number"
-         },
-         "Quality Level": {
-            "description": "Set game quality level (a preset of other settings)",
-            "editNote": "Changing this value may reset other settings to default.\nIf you want to change other settings, leave this value to 'Custom' and change other settings manually.",
-            "key": "KeyQualityLevel",
-            "src": "advanceSettings",
-            "type": "enum",
-            "values": [
-               "Low",
-               "Medium",
-               "High",
-               "Custom"
-            ]
-         },
          "Brightness": {
             "description": "Set brightness level. however, it works more like a gamma correction.",
-            "key": "KeyBrightness",
+            "key": "Brightness",
             "src": "advanceSettings",
             "type": "number",
             "range": [-1, 1],
             "default": 0
          },
          "FPS Limit": {
-            "description": "Set maximum frame rate\nSome ppl said that someone got baned from setting this value to 120, so do it with YOUR OWN RISK.\nPS: value higher than 60 will be shown in the game as 60)",
-            "key": "KeyCustomFrameRate",
+            "description": "Set maximum frame rate\nSome ppl said that someone got baned from setting this value to 120, so do it with YOUR OWN RISK.\nPS: value higher than 60 will be shown in the game as 30)",
+            "key": "CustomFrameRate",
             "src": "advanceSettings",
-            "type": "number",
-            "range": [30],
-            "default": 60
+            "type": "enum",
+            "values": [
+               [1, "30"],
+               [2, "60"],
+               [3, "120"],
+               [4, "144?"],
+               [5, "240?"]
+            ]
          },
          "HDR": {
             "description": "Enable/Disable HDR. for HDR supported monitors.",
@@ -136,6 +118,7 @@
             "description": "this setting shouldn't be edited by the user as the game would automatically overwrite it, FPS limit setting that the game will use is 'FPS Limit'",
             "key": "FrameRateLimit",
             "src": "userSettings",
+            "type": "number",
             "editable": false
          },
          "Window Position X": {
@@ -154,7 +137,7 @@
          },
          "Quality Setting Level": {
             "description": "Set game quality level? (may be a Duplicate of 'Quality Level' setting)",
-            "editNote": "Changing this value may reset other settings to default.\nand this may be a Duplicate of 'Quality Level' setting",
+            "editNote": "Changing this value may reset other settings to default as this may be a Duplicate of 'Quality Level' setting",
             "key": "GameQualitySettingLevel",
             "src": "userSettings",
             "type": "enum",
@@ -199,9 +182,9 @@
                "Ultra"
             ]
          },
-         "New Shadow Quality": {
+         "Shadow Quality (2)": {
             "description": "may be a duplicate of 'Shadow Quality' setting",
-            "key": "KeyNewShadowQuality",
+            "key": "ShadowQuality",
             "src": "advanceSettings",
             "type": "enum",
             "values": [
@@ -210,6 +193,122 @@
                "High",
                "Ultra"
             ]
+         },
+         "Image Quality": {
+            "description": "Set image quality (may be a Duplicate of 'Quality Level' setting)",
+            "key": "ImageQuality",
+            "src": "advanceSettings",
+            "type": "number",
+            "range": [0]
+         },
+         "Image Details": {
+            "description": "Set image details",
+            "key": "ImageDetail",
+            "src": "advanceSettings",
+            "type": "number",
+            "range": [0]
+         },
+         "Ray Tracing": {
+            "description": "Enable/Disable Ray Tracing",
+            "key": "RayTracing",
+            "src": "advanceSettings",
+            "type": "bool"
+         },
+         "Ray Tracing GI": {
+            "description": "Ray Tracing Global Illumination",
+            "key": "RayTracedGI",
+            "src": "advanceSettings",
+            "type": "number",
+            "default": 0
+         },
+         "Ray Tracing Reflections": {
+            "description": "Ray Tracing Reflections",
+            "key": "RayTracedReflection",
+            "src": "advanceSettings",
+            "type": "number",
+            "default": 0
+         },
+         "Ray Tracing Shadow Quality": {
+            "description": "Set Ray Tracing Shadow Quality",
+            "key": "RayTracedShadow",
+            "src": "advanceSettings",
+            "type": "number",
+            "default": 0
+         },
+         "Crowd Density": {
+            "description": "Set Crowd Density",
+            "key": "NpcDensity",
+            "src": "advanceSettings",
+            "type": "enum",
+            "values": [
+               "Low",
+               "Medium",
+               "High"
+            ]
+         },
+         "Nvidia DLSS": {
+            "description": "Enable/Disable Nvidia DLSS",
+            "key": "NvidiaSuperSamplingEnable",
+            "src": "advanceSettings",
+            "type": "bool"
+         },
+         "Nvidia DLSS Mode": {
+            "description": "Set Nvidia DLSS Mode\n4: Quality",
+            "key": "NvidiaSuperSamplingMode",
+            "src": "advanceSettings",
+            "type": "number",
+            "range": [0]
+         },
+         "Nvidia DLSS Frame Generate": {
+            "description": "Nvidia DLSS Frame Generate?",
+            "key": "NvidiaSuperSamplingFrameGenerate",
+            "src": "advanceSettings",
+            "type": "number",
+            "range": [0]
+         },
+         "Nvidia DLSS Sharpness": {
+            "description": "Set Nvidia DLSS Sharpness",
+            "key": "NvidiaSuperSamplingSharpness",
+            "src": "advanceSettings",
+            "type": "number",
+            "range": [0]
+         },
+         "Nvidia Reflex": {
+            "description": "Enable/Disable Nvidia Reflex",
+            "key": "NvidiaReflex",
+            "src": "advanceSettings",
+            "type": "bool"
+         },
+         "FSR": {
+            "description": "Enable/Disable FidelityFX Super Resolution",
+            "key": "FsrEnable",
+            "src": "advanceSettings",
+            "type": "bool"
+         },
+         "XeSS": {
+            "description": "Enable/Disable XeSS",
+            "key": "XessEnable",
+            "src": "advanceSettings",
+            "type": "bool"
+         },
+         "XeSS Quality": {
+            "description": "Set XeSS Quality",
+            "key": "XessQuality",
+            "src": "advanceSettings",
+            "type": "number",
+            "range": [0]
+         },
+         "Ambient Occlusion": {
+            "description": "Set Ambient Occlusion\n0: Disable\n1: Enable",
+            "key": "SceneAo",
+            "src": "advanceSettings",
+            "type": "number"
+         },
+         "Metallic Fx": {
+            "description": "Enable/Disable Metallic Fx",
+            "key": "MetalFxEnable",
+            "src": "advanceSettings",
+            "type": "bool"
          }
       },
       "bindings": {
@@ -659,13 +758,6 @@
             "src": "userSettings",
             "type": "string",
             "default": "en"
-         },
-         "IsAutoSwitchSkillButtonMode": {
-            "description": "Not sure what this does or supposed to mean T.T",
-            "key": "IsAutoSwitchSkillButtonMode",
-            "src": "advanceSettings",
-            "type": "number",
-            "default": 0
          }
       }
    },

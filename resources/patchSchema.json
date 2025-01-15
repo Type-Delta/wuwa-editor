@@ -18,9 +18,9 @@
       },
       "SettingSrcDataType": {
          "type": "string",
-         "description": "type of this content inside the file (after the read process), defined how to parse it's content",
+         "description": "type of this content inside the file (after the read process), defined how to parse it's content  JSON: JSON object (stored as string)\n\n - ini: INI file format (typically key-value pair) (stored as string)\n - KBTupleMap: Key-Binding Tuple Map (stored as string)\n - literal: literal key-value pair object got from binary files, this type does not require much parsing (not at all if `literalTypeParsing` is false), currently only support SQLite3 database",
          "enum": [
-            "JSON", "ini", "KBTupleMap"
+            "JSON", "ini", "KBTupleMap", "literal"
          ]
       },
       "SettingSrcFileType": {
@@ -102,7 +102,7 @@
             "settingGroups": {
                "type": "object",
                "title": "Setting Groups",
-               "description": "explicitly define setting groups in the source file. group name as Key and predicate to match Game-Setting Keys belong to said group as a value (only takes effect when writting)\n\nOrder of the group is important, as the program will match from the first group to the last group\nthe matched key will never match twice (similar to if-else statement)\n\n predicate can be a key name for literal match (===) or predicate function as follow:\n - `$if:<statement>`: match if the JavaScript statement is true (available variable(s) is `key`)\n - `$regex:<pattern>`: match if the key match the regular expression pattern",
+               "description": "explicitly define setting groups in the source file. group name as Key and predicate to match Game-Setting Keys belong to said group as a value (only takes effect when writting)\n\nCurrently, only Ini data type supports this.\n\nOrder of the group is important, as the program will match from the first group to the last group\nthe matched key will never match twice (similar to if-else statement)\n\n predicate can be a key name for literal match (===) or predicate function as follow:\n - `$if:<statement>`: match if the JavaScript statement is true (available variable(s) is `key`)\n - `$regex:<pattern>`: match if the key match the regular expression pattern",
                "additionalProperties": {
                   "type":"array",
                   "title": "Setting Group Predicate",
@@ -132,6 +132,45 @@
                   }
                }
 
+            },
+            "filter": {
+               "type": "string",
+               "title": "Filter",
+               "description": "filter to use when reading the file or database\n\nThe filter can be:\n\n - `$sql:<sqlCondition>`: use SQL condition to filter the data (only used when the source file is a database, this property is ignored otherwise)",
+               "anyOf": [
+                  {
+                     "title": "Filter - SQL Condition",
+                     "pattern": "^\\$sql:"
+                  }
+               ]
+            },
+            "readMapper": {
+               "type": "string",
+               "title": "Read Mapper",
+               "description": "mapper function to use when reading the source file (this function will be used to map the raw data to the setting object)\n\n available values:\n\n - `<$func>`: use custom map function defined with syntax `$func:<functionBody>` with two parameters `key`, `value`, DO NOT return anything, only re-assign to overwrite key or value.",
+               "anyOf": [
+                  {
+                     "title": "Read Mapper - Custom Mapper",
+                     "pattern": "^\\$func:"
+                  }
+               ]
+            },
+            "writeMapper": {
+               "type": "string",
+               "title": "Write Mapper",
+               "description": "mapper function to use when writing the source file (this function will be used to map the setting object to raw data)\n\n available values:\n\n - `<$func>`: use custom map function defined with syntax `$func:<functionBody>` with two parameters `key`, `value`, DO NOT return anything, only re-assign to overwrite key or value.",
+               "anyOf": [
+                  {
+                     "title": "Write Mapper - Custom Mapper",
+                     "pattern": "^\\$func:"
+                  }
+               ]
+            },
+            "literalTypeParsing": {
+               "type": "boolean",
+               "title": "Literal Type Parsing",
+               "description": "whether to parse the values of 'literal' type from 'string' to 'JavaScript types' (only used when setting type is 'literal')",
+               "default": false
             },
             "selectedTable": {
                "type": "string",

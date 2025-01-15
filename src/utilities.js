@@ -135,9 +135,11 @@ function closeLogFile() {
 
 /**
  * stream write log message waiting to be written
- * @param {any} message
+ * @template T
+ * @param {T} message
  * @param {4|3|2|1|0} level message level, debug: 4, normal: 3, warn: 2, error: 1, critical: 0
  * @param {boolean} [print=false] whether to print the message to terminal
+ * @returns {T}
  */
 function writeLog(message, level = 3, print = false) {
    if(typeof message !== 'string'){
@@ -158,7 +160,7 @@ function writeLog(message, level = 3, print = false) {
 
    message = to.cleanString(message);
 
-   if(_global.logFileWS === null) return false;
+   if(_global.logFileWS === null) return message;
 
    const D = new Date();
    let time = [
@@ -177,6 +179,7 @@ function writeLog(message, level = 3, print = false) {
    });
 
    _global.logFileWS.write(content);
+   return message;
 }
 
 /**

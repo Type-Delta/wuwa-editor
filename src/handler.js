@@ -7,7 +7,6 @@ const { open } = require('sqlite');
 const _ = require('lodash');
 
 const to = require('./helper/Tools.js');
-const terminal = require('./term.js');
 const { color } = require('./global.js');
 const { predicate, writeLog } = require('./utilities.js');
 const config = require('./config.js');
@@ -351,17 +350,10 @@ function readPlainText(configPath){
 /**
  * @param {string} filePath full path to the database file
  * @param {SettingSrcMetadata} settingSrc
- * @returns {Promise<string[]|null>}
  */
 async function readSQLite(filePath, settingSrc){
    if(settingSrc.manifest?.selectedTable === undefined){
       writeLog(`unable to read from SQLite database: missing "selectedTable" property in source metadata`, 2, true);
-      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
-      return null;
-   }
-
-   if(!(settingSrc.manifest?.acceptedGroups?.length)){
-      writeLog(`unable to read from SQLite database: missing "acceptedGroups" property in source metadata`, 2, true);
       writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
       return null;
    }
@@ -373,7 +365,7 @@ async function readSQLite(filePath, settingSrc){
     * @type {any}
     */
    let db = null;
-   let rawSettings = [];
+   let rawSettings = new Map;
    try {
       writeLog(`Opening SQLite database from "${filePath}"`);
       db = await open({
@@ -381,12 +373,36 @@ async function readSQLite(filePath, settingSrc){
          driver: sqlite3.Database
       });
 
-      for(const group of settingSrc.manifest.acceptedGroups){
-         writeLog(`executing SQL: \`SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'\``);
+      if(settingSrc.manifest?.acceptedGroups?.length){
+         for(const group of settingSrc.manifest.acceptedGroups){
+            let query = `SELECT key, value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'`;
+            if(settingSrc.manifest?.filter && settingSrc.manifest.filter.startsWith('$sql:'))
+               query += ' AND ' + settingSrc.manifest.filter.slice(5);
 
-         const result = await db.all(
-            `SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'`
-         );
+            writeLog(`executing SQL: \`${query}\``);
+            const result = await db.all(query);
+
+            if(!result.length){
+               writeLog(
+                  `SQLite failed to resolve setting from "${filePath}"`,
+                  2, true
+               );
+               writeLog('failed reason: "no result"', 2);
+               return null;
+            }
+
+            // TODO: unable to parse some custom object like `sqlite3.Database`
+            writeLog(`query result: ${to.yuString([...result])}`);
+            rawSettings.set(group, result[0].value);
+         }
+      }
+      else {
+         let query = `SELECT key, value FROM ${settingSrc.manifest.selectedTable}`;
+         if(settingSrc.manifest?.filter && settingSrc.manifest.filter.startsWith('$sql:'))
+            query += ' WHERE ' + settingSrc.manifest.filter.slice(5);
+
+         writeLog(`executing SQL: \`${query}\``);
+         const result = await db.all(query);
 
          if(!result.length){
             writeLog(
@@ -397,12 +413,13 @@ async function readSQLite(filePath, settingSrc){
             return null;
          }
 
-         // TODO: unable to parse some custom object like `sqlite3.Database`
          writeLog(`query result: ${to.yuString([...result])}`);
-         rawSettings.push(result[0]);
+         for(const row of result){
+            rawSettings.set(row.key, row.value);
+         }
       }
 
-      return rawSettings.map(res => res.value);
+      return rawSettings;
 
    } catch (e) {
       writeLog(
@@ -436,149 +453,12 @@ async function loadIniKeyVal(configPath, settingSrc){
          strSettings = await readSQLite(configPath, settingSrc);
          if(!strSettings) return null;
 
-         strSettings = strSettings.join('\n');
+         strSettings = [...strSettings.values()].join('\n');
          break;
    }
 
    return to.parseConfig(strSettings, null, { ignoreGroups: false });
 }
-
-
-/**
- * @param {any} rawSetting raw settings of this source file
- * @param {string} settingKey
- * @param {string} srcFile file path this setting originated from
- * @return {ParsedGameSettingObj|null} parsed setting object
- */
-function parseIniKeyVal(rawSetting, settingKey, srcFile){
-   let setting = undefined;
-   let group = null;
-   for(group in rawSetting){
-      if(rawSetting[group][settingKey] !== undefined){
-         setting = rawSetting[group];
-         break;
-      }
-   }
-
-   if(setting?.[settingKey] == undefined){
-      writeLog(
-         `Key "${settingKey}" not found in source config "${srcFile}"`,
-         2, true
-      );
-      return null;
-   }
-
-   // @ts-expect-error return type is not the same as the function signature
-   return parseValue(setting[settingKey]);
-
-
-   function parseValue(value){
-      switch (typeof value) {
-         case 'boolean':
-            return { value, type: 'bool', group };
-         case 'string':
-            if(!value||value == 'null'||value == 'undefined')
-               return {value: null, type: 'string', group };
-            return { value, type: 'string', group };
-         case 'number':
-            return { value, type: 'number', group };
-         default:
-            return { value: value.toString(), type: 'string', group };
-      }
-   }
-}
-
-
-/**
- * @param {string} settingScrPath FULL PATH to the setting source file
- * @param {SettingSrcMetadata} settingSrc
- * @param {Map<string, ParsedGameSettingObj>} settings
- */
-async function writeIniKeyVal(settingScrPath, settingSrc, settings){
-   let noGroup = to.remap(Object.fromEntries(settings),
-      (key, value) =>  {
-         switch (value.type) {
-            case 'bool':
-               assert(typeof value.value === 'boolean', 'value of type "bool" must be a boolean');
-               value.value = value.value ? 'True' : 'False';
-               break;
-            case 'string': assert(typeof value.value === 'string', 'value of type "string" must be a string');
-               break;
-            case 'number':
-            case 'enum': assert(typeof value.value === 'number', 'value of type "number" must be a number');
-               break;
-            default:
-               throw new Error(`[Error] while writing: Type "${value.type}" is not supported for type "ini-keyValue"`);
-         }
-
-         return {
-            key: value.key,
-            value: {
-               value: value.value,
-               group: value.group
-            }
-         }
-      }
-   );
-
-
-   let withGroup = {};
-
-   // some src files may not have manifest, it's okay
-   if(settingSrc.manifest?.settingGroups){
-      let groupedKeys = [];
-      for(const groupName in settingSrc.manifest.settingGroups){
-         for(const key in noGroup){
-            if(groupedKeys.includes(key)) continue;
-
-            for(const predicateStr of settingSrc.manifest.settingGroups[groupName]){
-               if(!predicate(predicateStr, key)) continue;
-
-               if(withGroup[groupName] === undefined)
-                  withGroup[groupName] = {};
-
-               withGroup[groupName][key] = noGroup[key].value;
-               groupedKeys.push(key);
-               break;
-            }
-         }
-      }
-   }
-   else {
-      for(let key in noGroup){
-         const group = noGroup[key].group;
-
-         if(!group){
-            withGroup[key] = noGroup[key].value;
-            continue;
-         }
-
-         if(!withGroup[group]) withGroup[group] = {};
-         withGroup[group][key] = noGroup[key].value;
-      }
-   }
-
-   if(to.propertiesCount(withGroup) < 1){
-      writeLog(
-         `settings write preparation failed: no settings to write to "${settingScrPath}`, 2
-      );
-      return;
-   }
-
-   writeLog(`Writing IniKeyVal to "${settingScrPath}" with type "${settingSrc.type}"`);
-   switch(settingSrc.type){
-      case 'plainText':
-         to.writeConfig(withGroup, settingScrPath, {
-            useIniGroup: true,
-            minify: true
-         });
-         break;
-      case 'sqlite':
-         await writeSQLite(settingScrPath, settingSrc, withGroup);
-         break;
-   }
-}
-
 
 
 /**
@@ -604,6 +484,8 @@ async function loadJSON(configPath, settingSrc) {
          strSettings = await readSQLite(configPath, settingSrc);
          if(!strSettings) return null;
 
+         strSettings = [...strSettings.values()];
+
          let groupIndex = 0;
          for(let group of settingSrc.manifest.acceptedGroups ?? ['$null']){
             settings[group] = JSON.parse(strSettings[groupIndex++], settingSrc.manifest.Reviver);
@@ -619,103 +501,6 @@ async function loadJSON(configPath, settingSrc) {
    }
 
    return settings;
-}
-
-// Parse SQLite uses the same function as IniKeyVal,
-// the alias is defined at the bottom of the file
-
-/**
- * @param {SettingSrcMetadata} settingSrc
- * @param {{[group: string]: any}} settings object with group names as keys, each value will be stringified
- * @param {string} filePath database path
- */
-async function writeSQLite(filePath, settingSrc, settings){
-   if(settingSrc.manifest?.selectedTable === undefined){
-      writeLog(
-         `unable to write to SQLite database: missing "selectedTable" property in source metadata`, 2
-      );
-      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
-      return false;
-   }
-
-   if(!(settingSrc.manifest?.acceptedGroups?.length)){
-      terminal.warn(
-         `unable to write to SQLite database: missing "acceptedGroups" property in source metadata`, 2
-      );
-      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
-      return false;
-   }
-
-   if(typeof settingSrc.manifest.Replacer == 'string'){
-      writeLog('program not properly initialized: Replacer is not a function', 2);
-      return false;
-   }
-
-   if(filePath.startsWith('.'))
-      filePath = path.resolve(config.gameInstalledPath, filePath);
-
-   writeLog(`Writing to SQLite database "${filePath}"`);
-
-   /**
-    * Query:
-    * `UPDATE LocalStorage SET value = $settingStr WHERE key == \'GameQualitySetting\'`
-    */
-   /**
-    * @type {any}
-    */
-   let db = null;
-   try {
-      writeLog(`Opening SQLite database from "${filePath}"`);
-      db = await open({
-         filename: filePath, // absolute path only!
-         driver: sqlite3.Database
-      });
-
-
-      for(const group of settingSrc.manifest.acceptedGroups){
-         if(settings[group] == undefined){
-            writeLog(
-               `Error writting to SQLite database "${filePath}": the group "${group}" does not exist in settings`, 2
-            );
-            continue;
-         }
-
-         // check if the group exists
-         const res = await db.all(
-            `SELECT key FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'`
-         );
-
-         if(!res.length){
-            writeLog(
-               `Error writting to SQLite database "${filePath}": the group "${group}" does not exist in 'key' column in database`, 2
-            );
-            return false;
-         }
-
-
-         let settingStr = typeof settings[group] == 'string'
-            ? settings[group]
-            : JSON.stringify(settings[group], settingSrc.manifest.Replacer);
-
-         writeLog(`executing SQL: \`UPDATE ${settingSrc.manifest.selectedTable} SET value = '${settingStr}' WHERE key == '${group}'\``);
-         await db.all(
-            `UPDATE ${settingSrc.manifest.selectedTable} SET value = '${settingStr}' WHERE key == '${group}'`
-         );
-      }
-   }
-   catch (e) {
-      writeLog(
-         `Error writting to SQLite database "${filePath}": ${e.message}`, 2
-      );
-      writeLog(to.yuString(e), 2);
-      return false;
-   }
-   finally {
-      writeLog('Closing SQLite database');
-      db?.close();
-   }
-
-   return true;
 }
 
 
@@ -740,7 +525,7 @@ async function loadKBTupleMap(configPath, settingSrc) {
          strSettings = await readSQLite(configPath, settingSrc);
          if(!strSettings) return null;
 
-         strSettings = strSettings.join('\n');
+         strSettings = [...strSettings.values()].join('\n');
          break;
    }
 
@@ -788,6 +573,74 @@ async function loadKBTupleMap(configPath, settingSrc) {
 
    return settings;
 }
+
+/**
+ * load `KBTupleMap` dataType config file
+ * @param {string} configPath full path to the config file
+ * @param {SettingSrcMetadata} settingSrc
+ * @returns {Promise<{[group: string]: any}|null>} a rough parsed object of the config file, where keys in the first level are group names
+ *
+ */
+async function loadLiteral(configPath, settingSrc){
+   let rawSettings = null;
+   let settings = {};
+   switch(settingSrc.type){
+      case 'sqlite':
+         rawSettings = await readSQLite(configPath, settingSrc);
+         if(!rawSettings) return null;
+         break;
+   }
+
+   if(typeof settingSrc.manifest.readMapper == 'function'){
+      rawSettings = to.remap(rawSettings, settingSrc.manifest.readMapper);
+   }
+
+   settings['$null'] = Object.fromEntries(rawSettings);
+   return settings;
+}
+
+
+/**
+ * @param {any} rawSetting raw settings of this source file
+ * @param {string} settingKey
+ * @param {string} srcFile file path this setting originated from
+ * @return {ParsedGameSettingObj|null} parsed setting object
+ */
+function parseIniKeyVal(rawSetting, settingKey, srcFile){
+   let setting = undefined;
+   let group = null;
+
+   for(group in rawSetting){
+      if(rawSetting[group][settingKey] !== undefined){
+         setting = rawSetting[group];
+         break;
+      }
+   }
+
+   let value = setting?.[settingKey];
+
+   if(value == undefined){
+      writeLog(
+         `Key "${settingKey}" not found in source config "${srcFile}"`,
+         2, true
+      );
+      return null;
+   }
+
+   switch (typeof value) {
+      case 'boolean':
+         return { value, type: 'bool', group };
+      case 'string':
+         if(!value||value == 'null'||value == 'undefined')
+            return {value: null, type: 'string', group };
+         return { value, type: 'string', group };
+      case 'number':
+         return { value, type: 'number', group };
+      default:
+         return { value: value.toString(), type: 'string', group };
+   }
+}
+
 
 /**
  * @param {SrcKBTupleMap} rawSetting
@@ -922,6 +775,232 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
 }
 
 
+/**
+ * @param {any} rawSetting raw settings of this source file
+ * @param {string} settingKey
+ * @param {string} srcFile file path this setting originated from
+ * @param {boolean} typeParsing whether to parse the value to JavaScript type
+ * @return {ParsedGameSettingObj|null} parsed setting object
+ */
+function parseLiteral(rawSetting, settingKey, srcFile, typeParsing){
+   let setting = undefined;
+   let group = null;
+
+   for(group in rawSetting){
+      if(rawSetting[group][settingKey] !== undefined){
+         setting = rawSetting[group];
+         break;
+      }
+   }
+
+   let value = setting?.[settingKey];
+
+   if(setting?.[settingKey] == undefined){
+      writeLog(
+         `Key "${settingKey}" not found in source config "${srcFile}"`,
+         2, true
+      );
+      return null;
+   }
+
+   if(typeParsing)
+      value = to.parseValue(value);
+
+   switch (typeof value) {
+      case 'boolean':
+         return { value, type: 'bool', group };
+      case 'string':
+         if(!value||value == 'null'||value == 'undefined')
+            return {value: null, type: 'string', group };
+         return { value, type: 'string', group };
+      case 'number':
+         return { value, type: 'number', group };
+      default:
+         return { value: value?.toString(), type: 'string', group };
+   }
+}
+
+
+/**
+ * @param {string} settingScrPath FULL PATH to the setting source file
+ * @param {SettingSrcMetadata} settingSrc
+ * @param {Map<string, ParsedGameSettingObj>} settings
+ */
+async function writeIniKeyVal(settingScrPath, settingSrc, settings){
+   let noGroup = to.remap(Object.fromEntries(settings),
+      (key, value) =>  {
+         switch (value.type) {
+            case 'bool':
+               assert(typeof value.value === 'boolean', `value \`${value.key}:${value.value}\` of type "bool" must be a boolean, instead got ${typeof value.value}`);
+               break;
+            case 'string': assert(typeof value.value === 'string', `value \`${value.key}:${value.value}\` of type "string" must be a string, instead got ${typeof value.value}`);
+               break;
+            case 'number':
+            case 'enum': assert(typeof value.value === 'number', `value \`${value.key}:${value.value}\` of type "number" or "enum" must be a number, instead got ${typeof value.value}`);
+               break;
+            default:
+               throw new Error(`[Error] while writing: Type "${value.type}" is not supported for type "Ini-KeVal". Found in key "${value.key}"`);
+         }
+
+         return {
+            key: value.key,
+            value: {
+               value: value.value,
+               group: value.group
+            }
+         }
+      }
+   );
+
+
+   let withGroup = {};
+
+   // some src files may not have manifest, it's okay
+   if(settingSrc.manifest?.settingGroups){
+      let groupedKeys = [];
+      for(const groupName in settingSrc.manifest.settingGroups){
+         for(const key in noGroup){
+            if(groupedKeys.includes(key)) continue;
+
+            for(const predicateStr of settingSrc.manifest.settingGroups[groupName]){
+               if(!predicate(predicateStr, key)) continue;
+
+               if(withGroup[groupName] === undefined)
+                  withGroup[groupName] = {};
+
+               withGroup[groupName][key] = noGroup[key].value;
+               groupedKeys.push(key);
+               break;
+            }
+         }
+      }
+   }
+   else {
+      for(let key in noGroup){
+         const group = noGroup[key].group;
+
+         if(!group){
+            withGroup[key] = noGroup[key].value;
+            continue;
+         }
+
+         if(!withGroup[group]) withGroup[group] = {};
+         withGroup[group][key] = noGroup[key].value;
+      }
+   }
+
+   if(to.propertiesCount(withGroup) < 1){
+      writeLog(
+         `settings write preparation failed: no settings to write to "${settingScrPath}`, 2
+      );
+      return;
+   }
+
+   writeLog(`Writing Ini-KeyVal to "${settingScrPath}" with type "${settingSrc.type}"`);
+
+   let errorMsg;
+   switch(settingSrc.type){
+      case 'plainText':
+         to.writeConfig(withGroup, settingScrPath, {
+            useIniGroup: true,
+            minify: true
+         });
+         break;
+      case 'sqlite':
+         errorMsg = await writeSQLite(settingScrPath, settingSrc, withGroup);
+         break;
+   }
+
+   if(errorMsg)
+      throw new Error(errorMsg);
+}
+
+// Parse SQLite uses the same function as IniKeyVal,
+// the alias is defined at the bottom of the file
+
+/**
+ * @param {SettingSrcMetadata} settingSrc
+ * @param {{[key: string]: any}} settings object with group names as keys, each value will be stringified
+ * @param {string} filePath database path
+ * @returns {Promise<string|undefined>} error message if any
+ */
+async function writeSQLite(filePath, settingSrc, settings){
+   if(settingSrc.manifest?.selectedTable === undefined){
+      writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
+      return writeLog(
+         `unable to write to SQLite database: missing "selectedTable" property in source metadata`, 2
+      );
+   }
+
+   if(typeof settingSrc.manifest.Replacer == 'string'){
+      return writeLog('program not properly initialized: Replacer is not a function', 2);
+   }
+
+   if(filePath.startsWith('.'))
+      filePath = path.resolve(config.gameInstalledPath, filePath);
+
+   writeLog(`Writing to SQLite database "${filePath}"`);
+
+   /**
+    * Query:
+    * `UPDATE LocalStorage SET value = $settingStr WHERE key == \'GameQualitySetting\'`
+    */
+   /**
+    * @type {any}
+    */
+   let db = null;
+   try {
+      writeLog(`Opening SQLite database from "${filePath}"`);
+      db = await open({
+         filename: filePath, // absolute path only!
+         driver: sqlite3.Database
+      });
+
+
+      for(const key in settings){
+         if(
+            settingSrc.manifest.acceptedGroups.length &&
+            settingSrc.manifest.acceptedGroups.includes(key)
+         ){
+            writeLog(
+               `Error writting to SQLite database "${filePath}": the key "${key}" does not exist in settings`, 2
+            );
+            continue;
+         }
+
+         // check if the key exists
+         const res = await db.all(
+            `SELECT key FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${key}\'`
+         );
+
+         if(!res.length){
+            return writeLog(
+               `Error writting to SQLite database "${filePath}": the key "${key}" does not exist in 'key' column in database`, 1
+            );
+         }
+
+         let settingStr = typeof settings[key] == 'string' // the Database only accepts string
+            ? settings[key]
+            : JSON.stringify(settings[key], settingSrc.manifest.Replacer);
+
+         writeLog(`executing SQL: \`UPDATE ${settingSrc.manifest.selectedTable} SET value = '${settingStr}' WHERE key == '${key}'\``);
+         await db.all(
+            `UPDATE ${settingSrc.manifest.selectedTable} SET value = '${settingStr}' WHERE key == '${key}'`
+         );
+      }
+   }
+   catch (e) {
+      writeLog(to.yuString(e), 2);
+      return writeLog(
+         `Error writting to SQLite database "${filePath}": ${e.message}`, 2
+      );
+   }
+   finally {
+      writeLog('Closing SQLite database');
+      db?.close();
+   }
+}
+
 
 /*
 sqlite> SELECT value FROM LocalStorage WHERE key == 'CombineAction';
@@ -1047,7 +1126,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
    // write combined actions
    {
       const CASrcMeta = patch.configSrcMap.combinedAction;
-      const success = await writeSQLite(
+      const error = await writeSQLite(
          CASrcMeta.path,
          CASrcMeta,
          {  // for KBTupleMap 'CombinedAction' is the only accepted group however,
@@ -1056,7 +1135,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
          }
       );
 
-      if(!success){
+      if(error){
          writeLog(`failed to write combined actions to "${CASrcMeta.path}"`, 2);
          // even if it fails, we can still write the rest of the settings
       }
@@ -1079,6 +1158,72 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
    }
 
    return true;
+}
+
+/**
+ * @param {string} settingScrPath FULL PATH to the setting source file
+ * @param {SettingSrcMetadata} settingSrc
+ * @param {Map<string, ParsedGameSettingObj>} settings
+ * @param {boolean} typeParsing whether to parse the value from JavaScript type back to string
+ */
+async function writeLiteral(settingScrPath, settingSrc, settings, typeParsing){
+   let objSettings = to.remap(Object.fromEntries(settings),
+      (key, value) =>  {
+         let settingValue = value.value;
+
+         switch (value.type) {
+            case 'bool':
+               assert(typeof value.value === 'boolean', `value \`${value.key}:${value.value}\` of type "bool" must be a boolean, instead got ${typeof value.value}`);
+               break;
+            case 'string': assert(typeof value.value === 'string', `value \`${value.key}:${value.value}\` of type "string" must be a string, instead got ${typeof value.value}`);
+               break;
+            case 'number':
+            case 'enum': assert(typeof value.value === 'number', `value \`${value.key}:${value.value}\` of type "number" or "enum" must be a number, instead got ${typeof value.value}`);
+               break;
+            default:
+               throw new Error(`[Error] while writing: Type "${value.type}" is not supported for type "literal". Found in key "${value.key}"`);
+         }
+
+         if(typeof settingSrc.manifest.writeMapper == 'function'){
+            const mapped = settingSrc.manifest.writeMapper(key, value.value);
+            key = mapped.key;
+            settingValue = mapped.value;
+         }
+
+         return {
+            key: value.key,
+            value: {
+               value: typeParsing?  settingValue.toString(): settingValue,
+               group: value.group
+            }
+         }
+      }
+   );
+
+
+   let serializedSettings = {};
+   for(let key in objSettings){
+      serializedSettings[key] = objSettings[key].value;
+   }
+
+   if(to.propertiesCount(serializedSettings) < 1){
+      writeLog(
+         `settings write preparation failed: no settings to write to "${settingScrPath}`, 2
+      );
+      return;
+   }
+
+   writeLog(`Writing Literal to "${settingScrPath}" with type "${settingSrc.type}"`);
+
+   let errorMsg;
+   switch(settingSrc.type){
+      case 'sqlite':
+         errorMsg = await writeSQLite(settingScrPath, settingSrc, serializedSettings);
+         break;
+   }
+
+   if(errorMsg)
+      throw new Error(errorMsg);
 }
 
 
@@ -1121,14 +1266,17 @@ function getKeyFromBindingDeclaration(declarations, value, blacklist = []){
 
 module.exports = {
    loadIniKeyVal,
-   parseIniKeyVal,
-   writeIniKeyVal,
    loadKBTupleMap,
-   parseKBTupleMap,
-   writeKBTupleMap,
    loadJSON,
+   loadLiteral,
+   parseIniKeyVal,
+   parseKBTupleMap,
    parseSQLite: parseIniKeyVal, // alias
+   parseLiteral,
+   writeIniKeyVal,
+   writeKBTupleMap,
    writeSQLite,
+   writeLiteral,
    KeyBind,
    AxisBind
 };

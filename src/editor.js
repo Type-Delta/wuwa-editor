@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const _ = require('lodash');
+const assert = require('assert');
 let isElevated = null; // require('is-elevated')
 
 const to = require('./helper/Tools');
@@ -57,7 +58,12 @@ const { color } = _global;
  */
 
 /**
- * @typedef {'JSON'|'ini'|'KBTupleMap'} SettingSrcDataType type of the actual content inside the file, defined how to parse the content
+ * @typedef {'JSON'|'ini'|'KBTupleMap'|'literal'} SettingSrcDataType type of the actual content inside the file, defined how to parse the content
+ *
+ * - JSON: JSON object (stored as string)
+ * - ini: INI file format (typically key-value pair) (stored as string)
+ * - KBTupleMap: Key-Binding Tuple Map (stored as string)
+ * - literal: literal key-value pair object got from binary files, this type does not require much parsing (not at all if `literalTypeParsing` is false), currently only support SQLite3 database
  */
 
 /**
@@ -97,7 +103,7 @@ const { color } = _global;
  * @property {string} key key name of the setting in the config source file
  * @property {OptionPatchOptionTypes|undefined} type setting value type (what type this setting should be parsed as)
  * @property {'graphics'|'bindings'|'[Uncategorized]'|string} catergory setting group name
- * @property {string[]?} eValues enum values use only for setting with type 'enum' **(in patch.json this property is named `values`)**
+ * @property {[number, string][]|string[]|undefined} eValues enum values use only for setting with type 'enum' **(in patch.json this property is named `values`)**
  * @property {[number|undefined|null, number|undefined]?} range range of the ideal setting value **(in patch.json this property is named `range`)**
  * @property {string?} editNote note shown when editing the setting
  * @property {{[key: string]: string}?} valueDesc description of each value in the enum `key` for this object is the available enum values
@@ -115,6 +121,8 @@ const { color } = _global;
 /**
  * @typedef {Object} SettingSrcMetadataManifest
  * @property {{[groupName: string]: string[]}} settingGroups setting groups in the source file, group name as key and predicate to match setting keys as value
+ *
+ * Currently, only Ini data type supports this.
  *
  * Order of the group is important, as the program will match from the first group to the last group
  * the matched key will never match twice (similar to if-else statement)
@@ -139,6 +147,18 @@ const { color } = _global;
  * - 'default': use default replacer
  * - 'none': don't use any replacer (default)
  * - `<$func>`: use custom replacer function defined with syntax `$func:<functionBody>` with two parameters `key` and `value` (see [MDN Doc](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/parse#the_reviver_parameter))
+ * @property {string} filter filter to use when reading the file or database\n\nThe filter can be:
+ *
+ *  - `$sql:<sqlCondition>`: use SQL condition to filter the data (only used when the source file is a database, this property is ignored otherwise)
+ * @property {string|((key: string, value: any) => any)|undefined|null} readMapper mapper function to use when reading the source file (this function will be used to map the raw data to the setting object)
+ *
+ *  available values:
+ *  - `<$func>`: use custom map function defined with syntax `$func:<functionBody>` with two parameters `key`, `value`, DO NOT return anything, only re-assign to overwrite key or value.
+ * @property {string|((key: string, value: any) => any)|undefined|null} writeMapper mapper function to use when writing the source file (this function will be used to map the setting object to raw data)
+ *
+ * available values:
+ *  - `<$func>`: use custom map function defined with syntax `$func:<functionBody>` with two parameters `key`, `value`, DO NOT return anything, only re-assign to overwrite key or value.
+ * @property {boolean} literalTypeParsing whether to parse the values of 'literal' type from 'string' to 'JavaScript types' (only used when setting type is 'literal') (default: false)
  */
 
 /**
@@ -242,7 +262,7 @@ terminal.on('code', async (code) => {
    }
 });
 
-process.on('beforeExit', doShutdownTask);
+process.on('beforeExit', exitProgram);
 
 (async () => {
    await doStartupTask();
@@ -251,7 +271,7 @@ process.on('beforeExit', doShutdownTask);
       terminal.log(
          `${ncc('Red')}[error]${ncc()} This program must be run as administrator`
       );
-      return doShutdownTask(1);
+      return exitProgram(1);
    }
 
    checkInstalledPath:
@@ -313,7 +333,7 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
    }
 
    if (!verifyGamePath(config.gameInstalledPath))
-      return doShutdownTask(1);
+      return exitProgram(1);
 
    const [ loadSettingsRes ] = await Promise.all([
       loadSettings(),
@@ -335,7 +355,7 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
 
    terminal.log('\n'.padEnd(terminal.height - 1, '\n'));
    await showMainMenu(settingTFIDF, settingSearchFields);
-   doShutdownTask();
+   exitProgram();
 })();
 
 
@@ -483,12 +503,16 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
                   sValue = ncc(setting.value?'Green':'Red') + setting.value;
                   break;
                case 'number':
-                  if(setting.type == 'enum')
-                     sValue = ncc(color.gold) + setting.eValues[setting.value];
+                  if(setting.type == 'enum'){
+                     sValue = ncc(color.gold) + (typeof setting.eValues[0] == 'string'
+                        ? setting.eValues[setting.value]
+                        : setting.eValues.find(v => v[0] == setting.value)[1]);
+                     sValue += ncc(color.gray7) + '\nRaw: ' + ncc(color.gray5) + setting.value;
+                  }
                   else sValue = ncc(color.aquaPink) + setting.value;
                   break;
-               default:
                case 'string':
+               default:
                   sValue = ncc(color.grayB) + setting.value;
             }
          }
@@ -610,8 +634,12 @@ function drawSettingEditor(
 
          case 'enum':
             if(typeof setting.value == 'number'){
-               sValue = ncc(color.gold) + setting.eValues[setting.value];
+               sValue = ncc(color.gold) + (typeof setting.eValues[0] == 'string'
+                  ? setting.eValues[setting.value]
+                  : setting.eValues.find(v => v[0] == setting.value)[1]);
                leftPanelItems = setting.eValues.map((v, i) => {
+                  if(typeof v != 'string') v = v[1];
+
                   if(i === setting.default)
                      return v + ncc(color.gold) + ncc('Italic') + ' (default)' + ncc(color.gray7);
 
@@ -622,8 +650,11 @@ function drawSettingEditor(
                leftPIndex = choiceIndex;
                rightPanelActive = false;
 
-               if(setting.default !== undefined)
-                  defaultStr = ncc(color.gold) + setting.eValues[setting.default];
+               if(setting.default !== undefined){
+                  defaultStr = ncc(color.gold) + (typeof setting.eValues[0] == 'string'
+                        ? setting.eValues[setting.default]
+                        : setting.eValues.find(v => v[0] == setting.default)[1]);
+               }
             }
             else {
                writeLog(`Invalid setting value type for enum setting\nsetting: ${to.yuString(setting)}`, 2);
@@ -751,11 +782,21 @@ function drawSettingEditor(
             // for string type currently editing value will be set outside this function as `statusMsg[0]`
       }
 
+      let selectedEValue;
+      if(setting.valueDesc&&setting.eValues){
+         selectedEValue = typeof setting.eValues[0] == 'string'
+            ? setting.eValues[choiceIndex]
+            : setting.eValues.find(v => v[0] == choiceIndex)[1];
+      }
 
       rightPanelContent = ncc(color.gray7) + setting.description + '\n\n' +
          (hearderMsg? ncc(color.grayB)+ncc('Bright')+ hearderMsg + ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7): '')  +
          (setting.editNote? '\n\n'+setting.editNote:'') +
-         (setting.valueDesc&&setting.valueDesc[setting.eValues[choiceIndex]]? '\n\n'+setting.valueDesc[setting.eValues[choiceIndex]]:'') +
+         (
+            (setting.valueDesc&&setting.eValues)&&setting.valueDesc[selectedEValue]
+            ? '\n\n'+setting.valueDesc[selectedEValue]
+            : ''
+         ) +
          (defaultStr? '\n\nDefault: ' + defaultStr + ncc(color.gray7): '\n') +
          `\nValue: ` + (rightPanelItems?'': sValue) + ncc(color.gray7);
    }
@@ -1203,7 +1244,9 @@ async function showSettingEditMenu(settingsMap, settingIndex){
             choiceIndex = setting.value? 1: 0;
             break;
          case 'enum':
-            choiceIndex = setting.value;
+            if(typeof setting.eValues[0] == 'string')
+               choiceIndex = setting.catergory;
+            else choiceIndex = setting.eValues.findIndex(v => v[0] == setting.value);
             break;
          case 'number':
             textField = setting.value + '';
@@ -1330,9 +1373,17 @@ async function showSettingEditMenu(settingsMap, settingIndex){
                   else choiceIndex = selectedSetting.eValues.length - 1;
 
                }else if(key == terminal.Keys.ENTER){
-                  if(selectedSetting.value != choiceIndex){
+                  const isSelectedChanged = typeof selectedSetting.eValues[0] == 'string'
+                     ? selectedSetting.value != choiceIndex
+                     : selectedSetting.value != selectedSetting.eValues[choiceIndex][0];
+
+                  if(isSelectedChanged){
                      changesBackup.set(selectedSettingName, _.cloneDeep(selectedSetting));
-                     selectedSetting.value = choiceIndex;
+
+                     if(typeof selectedSetting.eValues[0] == 'string')
+                        selectedSetting.value = choiceIndex;
+                     else selectedSetting.value = selectedSetting.eValues[choiceIndex][0];
+
                      clearListeners();
                      return resolve(
                         ncc(color.aquaPink)+selectedSettingName+ncc(color.gray9)+' updated to '+ncc(color.mikuCyan)+selectedSetting.eValues[choiceIndex]+ncc(color.gray9)
@@ -1791,7 +1842,9 @@ async function showMainMenu(settingTFIDF, settingSearchFields){
                   settings.parsed, settingTFIDF, settingSearchFields
                );
                inOtherMenu = false;
-               statusMsg[1] = changesBackup.size + ' unsaved changes'
+               statusMsg[1] = changesBackup.size
+                  ? ncc('Bright') + ncc('Yellow') + changesBackup.size + ' unsaved changes' + ncc() + ncc(color.gray9) + ncc(color.gray3, 'bg')
+                  : '';
          }
 
          drawMainMenu(settingGroups, selectedIndex, statusMsg, {
@@ -1926,10 +1979,9 @@ function loadPatch() {
    for(const src in patch.configSrcMap){
       const manifest = patch.configSrcMap[src].manifest;
       if(!manifest) continue;
-      if(typeof manifest.Replacer != 'string' || typeof manifest.Reviver != 'string') continue;
 
       // LINK: @jdn34 Replacer/Reviver syntax
-      if(manifest.Replacer){
+      if(manifest.Replacer && typeof manifest.Replacer == 'string'){
          if(manifest.Replacer === 'none'){
             manifest.Replacer = null;
             continue;
@@ -1948,7 +2000,7 @@ function loadPatch() {
             continue;
          }
       }
-      if(manifest.Reviver){
+      if(manifest.Reviver && typeof manifest.Reviver == 'string'){
          if(manifest.Reviver === 'none'){
             manifest.Reviver = null;
             continue;
@@ -1968,6 +2020,63 @@ function loadPatch() {
             continue;
          }
       }
+
+
+      if(manifest.readMapper && typeof manifest.readMapper == 'string'){
+         if(manifest.readMapper === 'none'){
+            manifest.readMapper = null;
+            continue;
+         }
+
+         else if(manifest.readMapper.startsWith('$func:')){
+            manifest.readMapper = manifest.readMapper.slice(6);
+
+            manifest.readMapper = new Function('key, value', `
+               ${manifest.readMapper}
+
+               return {
+                  key,
+                  value
+               };`
+            );
+         }
+         else{
+            writeLog(`Invalid readMapper for "${src}"`, 1, true);
+            writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
+            manifest.readMapper = null;
+            hasErrorOrWarning = true;
+            continue;
+         }
+      }
+      if(manifest.writeMapper && typeof manifest.writeMapper == 'string'){
+         if(manifest.writeMapper === 'none'){
+            manifest.writeMapper = null;
+            continue;
+         }
+
+         else if(manifest.writeMapper.startsWith('$func:')){
+            manifest.writeMapper = manifest.writeMapper.slice(6);
+
+            manifest.writeMapper = new Function('key, value', `
+               ${manifest.writeMapper}
+
+               return {
+                  key,
+                  value
+               };`
+            );
+         }
+         else{
+            writeLog(`Invalid writeMapper for "${src}"`, 1, true);
+            writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
+            manifest.writeMapper = null;
+            hasErrorOrWarning = true;
+            continue;
+         }
+      }
+
+      if(manifest.literalTypeParsing == undefined)
+         manifest.literalTypeParsing = false;
    }
 }
 
@@ -2050,8 +2159,11 @@ async function loadSettings(skipTFIDFCalculation = false) {
          case 'JSON':
             rawSettings = await handler.loadJSON(fullPath, patch.configSrcMap[src]);
             break;
+         case 'literal':
+            rawSettings = await handler.loadLiteral(fullPath, patch.configSrcMap[src]);
+            break;
          default:
-            writeLog(`Invalid dataType "${patch.configSrcMap[src].type}" for "${src}"`, 2, true);
+            writeLog(`Invalid dataType "${patch.configSrcMap[src].dataType}" for "${src}"`, 2, true);
             hasErrorOrWarning = true;
             continue;
       }
@@ -2076,7 +2188,20 @@ async function loadSettings(skipTFIDFCalculation = false) {
          }
       }
    }
-   parseSettings();
+
+   try{
+      parseSettings();
+   }
+   catch(e){
+      if(e instanceof assert.AssertionError){
+         writeLog(`Type checking failed: ${e.message}`, 2, true);
+         hasErrorOrWarning = true;
+      }
+      else {
+         writeLog(`Error while parsing settings: ${e.message}`, 1, true);
+         throw e;
+      }
+   }
 
    const settingSearchFields = [];
    const settingTFIDF = (skipTFIDFCalculation
@@ -2142,6 +2267,14 @@ async function parseSettings() {
                   combineActionMap
                );
                break;
+            case 'literal':
+               parsedValue = handler.parseLiteral(
+                  rawSettings.value,
+                  optDecl.key,
+                  rawSettings.src,
+                  patch.configSrcMap[optDecl.src].manifest.literalTypeParsing
+               );
+               break;
             default:
                writeLog(`Invalid type "${patch.configSrcMap[optDecl.src].type}" for "${optDecl.src}"`, 2, true);
                continue;
@@ -2165,6 +2298,22 @@ async function parseSettings() {
          if(optDecl.valueDesc) parsedValue.valueDesc = optDecl.valueDesc;
          if(optDecl.default !== undefined) parsedValue.default = optDecl.default;
          if(optDecl.editable != null) parsedValue.editable = optDecl.editable;
+
+         switch (parsedValue.type) {
+            case 'bool':
+               assert(typeof parsedValue.value === 'boolean', `value \`${parsedValue.key}:${parsedValue.value}\` of type "bool" must be a boolean, instead got ${typeof parsedValue.value}`);
+               break;
+            case 'string': assert(typeof parsedValue.value === 'string', `value \`${parsedValue.key}:${parsedValue.value}\` of type "string" must be a string, instead got ${typeof parsedValue.value}`);
+               break;
+            case 'number':
+            case 'enum': assert(typeof parsedValue.value === 'number', `value \`${parsedValue.key}:${parsedValue.value}\` of type "number" or "enum" must be a number, instead got ${typeof parsedValue.value}`);
+               break;
+            case 'axis':
+            case 'bindings':
+               break;
+            default:
+               throw new Error(`[Error] while writing: Type "${parsedValue.type}" is not supported. Found in key "${parsedValue.key}"`);
+         }
 
          settings.parsed.set(optName, parsedValue);
       }
@@ -2203,6 +2352,14 @@ async function parseSettings() {
                key,
                patch,
                combineActionMap
+            );
+            break;
+         case 'literal':
+            parsedValue = handler.parseLiteral(
+               srcConfig.value,
+               key,
+               srcConfig.src,
+               patch.configSrcMap[srcConfig.src].manifest.literalTypeParsing
             );
             break;
          default:
@@ -2281,6 +2438,14 @@ async function writeSettings(){
             case 'KBTupleMap':
                await handler.writeKBTupleMap(fullPath, _settings, patch, settings.allRawSettings);
                break;
+            case 'literal':
+               await handler.writeLiteral(
+                  fullPath,
+                  patch.configSrcMap[src],
+                  _settings,
+                  patch.configSrcMap[srcConfig.src].manifest.literalTypeParsing
+               );
+               break
             default:
                writeLog(`Invalid dataType "${patch.configSrcMap[src].dataType}" for "${src}"`, 2);
                continue;
@@ -2329,7 +2494,7 @@ async function exitProgram(){
       }
    }
 
-   doShutdownTask();
+   exitProgram();
 }
 
 
@@ -2426,7 +2591,7 @@ async function doStartupTask(){
  * cleanup and exit the program
  * @returns {never|void}
  */
-function doShutdownTask(exitCode = 0){
+async function exitProgram(exitCode = 0){
    if(shuttingDown) return;
    writeLog(`Shutting down...\n\n\n\n`);
 
@@ -2436,6 +2601,10 @@ function doShutdownTask(exitCode = 0){
    if(exitCode == 0){
       terminal.clearScreen();
       config.writeConfig();
+   }
+   else {
+      terminal.log(`\n\n${ncc('Red')}An error occurred, please check the log for more info.${ncc()}\n\nPress any key to exit...`);
+      await terminal.getch();
    }
    terminal.close();
 
