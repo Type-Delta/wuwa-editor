@@ -1,9 +1,11 @@
 //////////// Tools ////////////
 /**# tools for Javascript
- * @version 2.12.13
+ * @version 2.13.13
  * for Node.js >= 16.x.x
  * @module Tools
  * @changes
+ * - stringifyConfig() now supports multiValues and will add new pairs in the correct order
+ * - parseConfig() now supports multiValues
  * - optimize: IDGenerator()
  * - fix: package (receive) disordered for IPC
  * - add: JSComments Regex
@@ -3692,10 +3694,15 @@ const Tools = {
 
 
 
+   /**
+    * @typedef {Object} ParseConfigOptions
+    * @property {boolean} [ignoreGroups=false] ignore group in the config file
+    * @property {boolean} [multiValues=false] allow multiple values for a single key (if the key is defined multiple times, its value will be an array of all values)
+    */
    /**parse configuration file in UTF-8 encoding to a Javascript Object
     * @param {string}ConfigString configuration file content
     * @param {(function(this: any, string, any): any)|null} [JSONReviver=null] JSON reviver function, to parse JSON Object in side the config file
-    * @param {{ignoreGroups?: boolean}} [options]
+    * @param {ParseConfigOptions} [options]
     * @returns {any} configuration in Javascript Object
     * @example //in main file
     * const fs = require('fs');
@@ -3726,7 +3733,7 @@ const Tools = {
     * key2 = "value2"
     */
    parseConfig(ConfigString, JSONReviver = null, options = {}){
-      const { ignoreGroups = false } = options;
+      const { ignoreGroups = false, multiValues = false } = options;
 
       let rows = Tools.cleanArr(ConfigString.trim().split('\n'), ['', '\s', '\r']);
       let configObj = {};
@@ -3873,10 +3880,27 @@ const Tools = {
          }
 
          // if value isn't wrapped in quotes: try to parse it
-         if(activeGroup)
-            configObj[activeGroup][eachPair[0]] = valueWrappedInQ? eachPair[1]: Tools.parseValue(eachPair[1]);
-         else
-            configObj[eachPair[0]] = valueWrappedInQ? eachPair[1]: Tools.parseValue(eachPair[1]);
+         {
+            const assigningObj = activeGroup? configObj[activeGroup]: configObj;
+
+            if(multiValues && assigningObj.hasOwnProperty(eachPair[0])){
+               if(assigningObj[eachPair[0]]['$multiValues'] === undefined){
+                  assigningObj[eachPair[0]] = [assigningObj[eachPair[0]]];
+                  assigningObj[eachPair[0]]['$multiValues'] = true;
+               }
+
+               assigningObj[eachPair[0]].push(
+                  valueWrappedInQ
+                     ? eachPair[1]
+                     : Tools.parseValue(eachPair[1])
+               );
+            }
+            else {
+               assigningObj[eachPair[0]] = valueWrappedInQ
+                  ? eachPair[1]
+                  : Tools.parseValue(eachPair[1]);
+            }
+         }
       }
 
       return configObj;
@@ -4088,7 +4112,7 @@ const Tools = {
     * @param {string}string string to search from
     * @param {string|RegExp}searcher The Keyword, string or RegExp to search for
     * @param {number}position The index at which to begin searching the string object. If omitted, search starts at the beginning of the string. Also, if **Negative** value is use will search string from the back, similar to **`string.lastIndexOf()`** but position is **Negative Index**
-    * @returns {number} position of the string that match the searcher, if none, `-1` would return
+    * @returns {number} position of the first match, `-1` if none.
     */
    redexOf(string, searcher, position = 0){
       const thisNotStr = typeof(this) !== "string";
@@ -4534,10 +4558,17 @@ const Tools = {
 
       return savedConfig;
 
-      function write(key, valueObj, group){
+      function write(key, valueObj, group, noKeyOverride = false){
          let strValue = '';
-         if(valueObj[key] != null&&typeof valueObj[key] == 'object')
-            strValue = `${JSON.stringify(valueObj[key], replacer, minify?null:3)}\n`;
+         if(valueObj[key] != null&&typeof valueObj[key] === 'object'){
+            if(valueObj[key]['$multiValues']){
+               for(const val of valueObj[key]){
+                  write(key, { [key]: val }, group, true);
+               }
+               return;
+            }
+            else strValue = `${JSON.stringify(valueObj[key], replacer, minify?null:3)}\n`;
+         }
          else{
             if(typeof valueObj[key] == 'string'){
                if(alwaysWrapStrInQuotes||/\s|[\{\[\}\]]/.test(valueObj[key]))
@@ -4547,7 +4578,9 @@ const Tools = {
             else strValue = `${valueObj[key]}`;
          }
 
-         let keyIndex = Tools.redexOf(savedConfig, new RegExp(`^[ \\t]*\\b${key}\\s*=`, 'm'));
+         let keyIndex = noKeyOverride
+            ? -1
+            : Tools.redexOf(savedConfig, new RegExp(`^[ \\t]*\\b${key}\\s*=`, 'm'));
          let existGroupIndex;
          if(group === ''){
             existGroupIndex = -3;
@@ -4565,11 +4598,17 @@ const Tools = {
 
             if(useIniGroup){
                if(cantFindGroup){
-                  savedConfig += pair;
+                  savedConfig += pair + '\n';
                }else{
+                  const lastPairIndex = Tools.redexOf(
+                     savedConfig,
+                     new RegExp(`^\s*\n$`, 'm'),
+                     existGroupIndex
+                  );
+
                   savedConfig = Tools.strSplice(
                      savedConfig,
-                     existGroupIndex + group.length + 3,
+                     lastPairIndex,
                      0,
                      pair
                   );
@@ -5496,7 +5535,7 @@ const Tools = {
     * @property {boolean|undefined} [alwaysWrapStrInQuotes] always wrap string in quotes even if it's not required (doesn't have space, special char, etc.)
     */
    /**
-    * asynchronously write configuration to the given path
+    * synchronously write configuration to the given path
     *
     * which an be parsed back to the original object using `Tools.parseConfig()`
     *
