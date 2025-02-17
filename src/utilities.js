@@ -229,6 +229,32 @@ async function getFileHash(path, algorithm = config.fileDiffHash){
   });
 }
 
+/**
+ * A wrapper class for Symbol that acts like a string when not comparing.
+ * Can be used as a key in Map, returns its description when converted to string.
+ */
+class UniqueKey extends String {
+   /**
+    * @param {string} desc
+    */
+   constructor(desc){
+      super(desc);
+      this.symbol = Symbol(desc);
+   }
+
+   valueOf = () => this.symbol;
+   toString = () => this.symbol.description;
+
+   get description() {
+      return this.symbol.description;
+   }
+
+   [Symbol.toPrimitive](hint) {
+      return hint === 'string' || hint === 'default'
+         ? this.symbol.description : this.symbol;
+   }
+}
+
 module.exports = {
    isProcessRunning,
    getProcessPath,
@@ -240,5 +266,6 @@ module.exports = {
    isModuleGetIPathExist,
    canBuildGetIPath,
    resolveGameInstallPath,
-   getFileHash
+   getFileHash,
+   UniqueKey
 }

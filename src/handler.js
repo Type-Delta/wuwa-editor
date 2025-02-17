@@ -457,7 +457,9 @@ async function loadIniKeyVal(configPath, settingSrc){
          break;
    }
 
-   return to.parseConfig(strSettings, null, { ignoreGroups: false });
+   return to.parseConfig(strSettings, null, {
+      ignoreGroups: false, multiValues: true
+   });
 }
 
 
@@ -898,16 +900,24 @@ async function writeIniKeyVal(settingScrPath, settingSrc, settings){
 
    writeLog(`Writing Ini-KeyVal to "${settingScrPath}" with type "${settingSrc.type}"`);
 
+   return writeIniKeyVal_raw(settingScrPath, settingSrc, withGroup);
+}
+
+async function writeIniKeyVal_raw(settingScrPath, settingSrc, rawSettings) {
+   if(settingSrc.usedAsRaw)
+      writeLog(to.yuString(rawSettings), 4);
+
    let errorMsg;
    switch(settingSrc.type){
       case 'plainText':
-         to.writeConfig(withGroup, settingScrPath, {
+         to.writeConfig(rawSettings, settingScrPath, {
             useIniGroup: true,
+            mode: settingSrc.usedAsRaw ? 'replace' : 'merge',
             minify: true
          });
          break;
       case 'sqlite':
-         errorMsg = await writeSQLite(settingScrPath, settingSrc, withGroup);
+         errorMsg = await writeSQLite(settingScrPath, settingSrc, rawSettings);
          break;
    }
 
@@ -1274,6 +1284,7 @@ module.exports = {
    parseSQLite: parseIniKeyVal, // alias
    parseLiteral,
    writeIniKeyVal,
+   writeIniKeyVal_raw,
    writeKBTupleMap,
    writeSQLite,
    writeLiteral,

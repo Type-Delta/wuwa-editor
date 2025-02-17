@@ -1,7 +1,7 @@
 {
    "$schema": "./resources/patchSchema.json",
-   "gameVersion": "2.0.2",
-   "patchVersion": 2,
+   "gameVersion": "2.1.0",
+   "patchVersion": 3,
    "handlerVersion": 2,
    "configSrcMap": {
       "inputSettings": {
@@ -30,8 +30,8 @@
          "manifest": {
             "acceptedGroups": [],
             "filter": "$sql:value not like '[%' and value not like '{%'",
-            "readMapper": "$func:value = value === '\"___0B___\"'? false : (value === '\"___1B___\"'? true : value);if(['RayTracing','NvidiaSuperSamplingEnable','NvidiaReflex','MetalFxEnable','FsrEnable','XessEnable'].includes(key)) value = !!parseInt(value, 10);",
-            "writeMapper": "$func:if(['RayTracing','NvidiaSuperSamplingEnable','NvidiaReflex','MetalFxEnable','FsrEnable','XessEnable'].includes(key)) value = value? 1 : 0;value = value === false? '\"___0B___\"' : (value === true? '\"___1B___\"' : value);",
+            "readMapper": "$func:value = value === '\"___0B___\"'? false : (value === '\"___1B___\"'? true : value);if(['NvidiaSuperSamplingEnable','NvidiaReflex','MetalFxEnable','FsrEnable','XessEnable'].includes(key)) value = !!parseInt(value, 10);",
+            "writeMapper": "$func:if(['NvidiaSuperSamplingEnable','NvidiaReflex','MetalFxEnable','FsrEnable','XessEnable'].includes(key)) value = value? 1 : 0;value = value === false? '\"___0B___\"' : (value === true? '\"___1B___\"' : value);",
             "literalTypeParsing": true,
             "selectedTable": "LocalStorage"
          }
@@ -42,7 +42,6 @@
          "path": "./Wuthering Waves Game/Client/Saved/LocalStorage/LocalStorage.db",
          "type": "sqlite",
          "dataType": "JSON",
-         "configurable": false,
          "usedAsRaw": true,
          "manifest": {
             "acceptedGroups": [
@@ -52,6 +51,14 @@
             "Reviver": "$func:if(value?.___MetaType___ == '___Map___') return new Map(value.Content)",
             "Replacer": "$func:if(value instanceof Map) return {___MetaType___: '___Map___', Content: Array.from(value.entries())};"
          }
+      },
+      "engineSettings": {
+         "displayName": "Engine Settings",
+         "description": "Configure game engine settings",
+         "path": "./Wuthering Waves Game/Client/Saved/Config/WindowsNoEditor/Engine.ini",
+         "type": "plainText",
+         "dataType": "ini",
+         "usedAsRaw": true
       }
    },
    "options": {
@@ -96,9 +103,7 @@
             "values": [
                [1, "30"],
                [2, "60"],
-               [3, "120"],
-               [4, "144?"],
-               [5, "240?"]
+               [3, "120"]
             ]
          },
          "HDR": {
@@ -212,7 +217,7 @@
             "description": "Enable/Disable Ray Tracing",
             "key": "RayTracing",
             "src": "advanceSettings",
-            "type": "bool"
+            "type": "number"
          },
          "Ray Tracing GI": {
             "description": "Ray Tracing Global Illumination",
@@ -253,7 +258,7 @@
             "type": "bool"
          },
          "Nvidia DLSS Mode": {
-            "description": "Set Nvidia DLSS Mode\n4: Quality",
+            "description": "Set Nvidia DLSS Mode\n3: Quality",
             "key": "NvidiaSuperSamplingMode",
             "src": "advanceSettings",
             "type": "number",
@@ -841,7 +846,7 @@
             "allowMultiple": true,
             "type": "bindings"
          },
-         "Attacking to Utillity": {
+         "Attacking to Utility": {
             "description": "Changes the face button from attacking to utility functions ",
             "key": "组合主键",
             "src": "inputSettings",
@@ -864,6 +869,11 @@
             "type": "string",
             "default": "en"
          }
+      }
+   },
+   "postprocessor": {
+      "onChanged": {
+         "Ray Tracing": "$func:if(newValue != 0){let e = settings.allRawSettings.get('engineSettings');e.value['/Script/Engine.RendererRTXSettings'] = {'r.RayTracing':newValue,'r.RayTracing.LimitDevice':0,'r.RayTracing.EnableInGame':1,'r.RayTracing.EnableOnDemand':1,'r.RayTracing.EnableInEditor':1};settings.allRawSettings.set('engineSettings', e);} else {let e = settings.allRawSettings.get('engineSettings');delete e.value['/Script/Engine.RendererRTXSettings'];settings.allRawSettings.set('engineSettings', e);};srcWithChanges.add('engineSettings');"
       }
    },
    "bindingsDeclaration": {

@@ -14,6 +14,7 @@ const {
    closeLogFile,
    writeLog,
    resolveGameInstallPath,
+   UniqueKey
 } = require('./utilities.js');
 const terminal = require('./term.js');
 const handler = require('./handler.js');
@@ -83,7 +84,7 @@ const { color } = _global;
  *
  * the **key** is the setting name (not to be contused with keyName) in the patch.json
  *
- * @typedef {Map<string, ParsedGameSettingObj>} ParsedGameSettings
+ * @typedef {Map<UniqueKey, ParsedGameSettingObj>} ParsedGameSettings
 */
 
 /**
@@ -193,6 +194,10 @@ const { color } = _global;
  * @property {boolean?} editable whether user can edit this setting (default: true)
  */
 
+/**
+ * @typedef {Object} PostprocessorPatch
+ * @property {{[key: string]: string | (oldValue, newValue, settings: GameSettings, patch: GameSettingPatch) => {} | undefined}?} onChanged postprocessor functions to run before the setting is written to the source file if the setting is modified. The key is the setting name
+ */
 
 /**
  * @typedef {Object} GameSettingPatch
@@ -200,6 +205,7 @@ const { color } = _global;
  * @property {number} patchVersion patch file version
  * @property {number} handlerVersion handler version compatible with this patch
  * @property {OptionGroupsPatch} options settings grouped by category
+ * @property {PostprocessorPatch?} postprocessor postprocessor functions to run before the setting is written to the source file if the setting is modified
  * @property {BindingGroups} bindingsDeclaration declaration of binary type input (e.g. key press, mouse click)
  * @property {BindingGroups} axisDeclaration declaration of analog type input (e.g. mouse movement, joystick)
  * @property {{[key: string]: string}} bindingsDescription description of each binding key/axis
@@ -216,7 +222,7 @@ const { color } = _global;
 class GameSettings {
    /**
     * raw settings without declaration
-    * @type {Map<string, {src: string, value: any, group: string}>}
+    * @type {Map<UniqueKey, {src: string, value: any, group: string, key: string}>}
     */
    raw = null;
    /**
@@ -1799,19 +1805,19 @@ async function showMainMenu(settingTFIDF, settingSearchFields){
                switch(selectedIndex - to.propertiesCount(patch.options)){
                   // negative and 0 index for each settings category and [Uncategorized]
                   case 1: // save settings
-                     {
-                        const code = await writeSettings();
-                        if(!code){
-                           statusMsg[0] = 'Settings saved. changes will take effect after restarting the game';
-                        }
-                        else if(code == 1){
-                           statusMsg[0] = ncc('Red') + `The Game is running, please close it and try again.` + ncc(color.gray9);
-                        }
-                        else if(code == 2){
-                           statusMsg[0] = ncc('Red') + `Error while writing, see log for more info.` + ncc(color.gray9);
-                        }
-                        break KeySwitch;
+                  {
+                     const code = await writeSettings();
+                     if(!code){
+                        statusMsg[0] = 'Settings saved. changes will take effect after restarting the game';
                      }
+                     else if(code == 1){
+                        statusMsg[0] = ncc('Red') + `The Game is running, please close it and try again.` + ncc(color.gray9);
+                     }
+                     else if(code == 2){
+                        statusMsg[0] = ncc('Red') + `Error while writing, see log for more info.` + ncc(color.gray9);
+                     }
+                     break KeySwitch;
+                  }
 
                   case 2: // revert changes
                      if(!changesBackup.size){
@@ -1975,109 +1981,135 @@ function loadPatch() {
       return;
    }
 
-
    for(const src in patch.configSrcMap){
-      const manifest = patch.configSrcMap[src].manifest;
-      if(!manifest) continue;
-
-      // LINK: @jdn34 Replacer/Reviver syntax
-      if(manifest.Replacer && typeof manifest.Replacer == 'string'){
-         if(manifest.Replacer === 'none'){
-            manifest.Replacer = null;
-            continue;
-         }
-
-         if(manifest.Replacer === 'default')
-            manifest.Replacer = to.JSONReplacer;
-         else if(manifest.Replacer.startsWith('$func:')){
-            manifest.Replacer = createJSONReviver(manifest.Replacer);
-         }
-         else{
-            writeLog(`Invalid Replacer for "${src}"`, 1, true);
-            writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
-            manifest.Replacer = null;
-            hasErrorOrWarning = true;
-            continue;
-         }
-      }
-      if(manifest.Reviver && typeof manifest.Reviver == 'string'){
-         if(manifest.Reviver === 'none'){
-            manifest.Reviver = null;
-            continue;
-         }
-
-         if(manifest.Reviver === 'default')
-            manifest.Reviver = to.JSONReviver;
-
-         else if(manifest.Reviver.startsWith('$func:')){
-            manifest.Reviver = createJSONReviver(manifest.Reviver);
-         }
-         else{
-            writeLog(`Invalid Reviver for "${src}"`, 1, true);
-            writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
-            manifest.Reviver = null;
-            hasErrorOrWarning = true;
-            continue;
-         }
-      }
-
-
-      if(manifest.readMapper && typeof manifest.readMapper == 'string'){
-         if(manifest.readMapper === 'none'){
-            manifest.readMapper = null;
-            continue;
-         }
-
-         else if(manifest.readMapper.startsWith('$func:')){
-            manifest.readMapper = manifest.readMapper.slice(6);
-
-            manifest.readMapper = new Function('key, value', `
-               ${manifest.readMapper}
-
-               return {
-                  key,
-                  value
-               };`
-            );
-         }
-         else{
-            writeLog(`Invalid readMapper for "${src}"`, 1, true);
-            writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
-            manifest.readMapper = null;
-            hasErrorOrWarning = true;
-            continue;
-         }
-      }
-      if(manifest.writeMapper && typeof manifest.writeMapper == 'string'){
-         if(manifest.writeMapper === 'none'){
-            manifest.writeMapper = null;
-            continue;
-         }
-
-         else if(manifest.writeMapper.startsWith('$func:')){
-            manifest.writeMapper = manifest.writeMapper.slice(6);
-
-            manifest.writeMapper = new Function('key, value', `
-               ${manifest.writeMapper}
-
-               return {
-                  key,
-                  value
-               };`
-            );
-         }
-         else{
-            writeLog(`Invalid writeMapper for "${src}"`, 1, true);
-            writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
-            manifest.writeMapper = null;
-            hasErrorOrWarning = true;
-            continue;
-         }
-      }
-
-      if(manifest.literalTypeParsing == undefined)
-         manifest.literalTypeParsing = false;
+      loadSourceMap(src);
    }
+
+   if(patch.postprocessor){
+      if(patch.postprocessor.onChanged){
+         for(const key in patch.postprocessor.onChanged){
+            if(typeof patch.postprocessor.onChanged[key] != 'string')
+               continue;
+
+            if(patch.postprocessor.onChanged[key].startsWith('$func:')){
+               patch.postprocessor.onChanged[key] = new Function('oldValue, newValue, settings, patch, srcWithChanges',
+                  patch.postprocessor.onChanged[key].slice(6)
+               );
+            }
+            else {
+               writeLog(`Invalid onChanged function for "${key}"`, 1, true);
+               hasErrorOrWarning = true;
+            }
+         }
+      }
+   }
+}
+
+function loadSourceMap(sourceName) {
+   const sourceConfig = patch.configSrcMap[sourceName];
+   const manifest = sourceConfig.manifest;
+   if(!manifest) return;
+
+   sourceConfig.configurable = sourceConfig.configurable ?? true;
+   sourceConfig.usedAsRaw = sourceConfig.usedAsRaw ?? false;
+
+   // LINK: @jdn34 Replacer/Reviver syntax
+   if(manifest.Replacer && typeof manifest.Replacer == 'string'){
+      if(manifest.Replacer === 'none'){
+         manifest.Replacer = null;
+         return;
+      }
+
+      if(manifest.Replacer === 'default')
+         manifest.Replacer = to.JSONReplacer;
+      else if(manifest.Replacer.startsWith('$func:')){
+         manifest.Replacer = createJSONReviver(manifest.Replacer);
+      }
+      else{
+         writeLog(`Invalid Replacer for "${sourceName}"`, 1, true);
+         writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
+         manifest.Replacer = null;
+         hasErrorOrWarning = true;
+         return;
+      }
+   }
+   if(manifest.Reviver && typeof manifest.Reviver == 'string'){
+      if(manifest.Reviver === 'none'){
+         manifest.Reviver = null;
+         return;
+      }
+
+      if(manifest.Reviver === 'default')
+         manifest.Reviver = to.JSONReviver;
+
+      else if(manifest.Reviver.startsWith('$func:')){
+         manifest.Reviver = createJSONReviver(manifest.Reviver);
+      }
+      else{
+         writeLog(`Invalid Reviver for "${sourceName}"`, 1, true);
+         writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
+         manifest.Reviver = null;
+         hasErrorOrWarning = true;
+         return;
+      }
+   }
+
+
+   if(manifest.readMapper && typeof manifest.readMapper == 'string'){
+      if(manifest.readMapper === 'none'){
+         manifest.readMapper = null;
+         return;
+      }
+
+      else if(manifest.readMapper.startsWith('$func:')){
+         manifest.readMapper = manifest.readMapper.slice(6);
+
+         manifest.readMapper = new Function('key, value', `
+            ${manifest.readMapper}
+
+            return {
+               key,
+               value
+            };`
+         );
+      }
+      else{
+         writeLog(`Invalid readMapper for "${sourceName}"`, 1, true);
+         writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
+         manifest.readMapper = null;
+         hasErrorOrWarning = true;
+         return;
+      }
+   }
+   if(manifest.writeMapper && typeof manifest.writeMapper == 'string'){
+      if(manifest.writeMapper === 'none'){
+         manifest.writeMapper = null;
+         return;
+      }
+
+      else if(manifest.writeMapper.startsWith('$func:')){
+         manifest.writeMapper = manifest.writeMapper.slice(6);
+
+         manifest.writeMapper = new Function('key, value', `
+            ${manifest.writeMapper}
+
+            return {
+               key,
+               value
+            };`
+         );
+      }
+      else{
+         writeLog(`Invalid writeMapper for "${sourceName}"`, 1, true);
+         writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
+         manifest.writeMapper = null;
+         hasErrorOrWarning = true;
+         return;
+      }
+   }
+
+   if(manifest.literalTypeParsing == undefined)
+      manifest.literalTypeParsing = false;
 }
 
 
@@ -2184,7 +2216,7 @@ async function loadSettings(skipTFIDFCalculation = false) {
       for(const group in rawSettings){
          for (const key in rawSettings[group]) {
             const value = rawSettings[group][key];
-            settings.raw.set(key, { src, value, group });
+            settings.raw.set(new UniqueKey(key), { src, value, group, key });
          }
       }
    }
@@ -2315,17 +2347,15 @@ async function parseSettings() {
                throw new Error(`[Error] while writing: Type "${parsedValue.type}" is not supported. Found in key "${parsedValue.key}"`);
          }
 
-         settings.parsed.set(optName, parsedValue);
+         settings.parsed.set(new UniqueKey(optName), parsedValue);
       }
    }
 
    for(const [key, rSetting] of settings.raw){
       let alreadyParsed = false;
       for(const [/*optName*/, parsed] of settings.parsed){
-         if(parsed.key == key&&parsed.src == rSetting.src){
+         if(parsed.key === rSetting.key&&parsed.src === rSetting.src&&parsed.group === rSetting.group){
             alreadyParsed = true;
-            if(parsed.editable == false)
-               settings.parsed.delete(key);
             break;
          }
       }
@@ -2342,14 +2372,14 @@ async function parseSettings() {
          case 'ini':
             parsedValue = handler.parseIniKeyVal(
                srcConfig.value,
-               key,
+               rSetting.key,
                srcConfig.src
             );
             break;
          case 'KBTupleMap':
             parsedValue = handler.parseKBTupleMap(
                srcConfig.value,
-               key,
+               rSetting.key,
                patch,
                combineActionMap
             );
@@ -2357,7 +2387,7 @@ async function parseSettings() {
          case 'literal':
             parsedValue = handler.parseLiteral(
                srcConfig.value,
-               key,
+               rSetting.key,
                srcConfig.src,
                patch.configSrcMap[srcConfig.src].manifest.literalTypeParsing
             );
@@ -2369,14 +2399,14 @@ async function parseSettings() {
       }
 
       if(!parsedValue){
-         writeLog(`Failed to parse "${key}" with type "${srcConfig.dataType}"`, 2, true);
+         writeLog(`Failed to parse "${rSetting.key}" with type "${srcConfig.dataType}"`, 2, true);
          writeLog('failed reason: `parsedValue` is null', 2);
          hasErrorOrWarning = true;
          continue
       }
 
       parsedValue.src = rSetting.src;
-      parsedValue.key = key;
+      parsedValue.key = rSetting.key;
       parsedValue.group = rSetting.group;
       parsedValue.catergory = '[Uncategorized]';
 
@@ -2401,7 +2431,7 @@ async function writeSettings(){
    writeLog(`Original of changed value: ${to.yuString(changesBackup)}`, 4);
 
    const srcWithChanges = new Set();
-   for(const [/*name*/, parsed] of changesBackup){
+   for(const [name, parsed] of changesBackup){
       srcWithChanges.add(parsed.src);
 
       if(patch.configSrcMap[parsed.src]?.manifest?.includeSrc){
@@ -2409,17 +2439,39 @@ async function writeSettings(){
             srcWithChanges.add(src);
          }
       }
+
+      if(patch.postprocessor.onChanged?.[name]){
+         const func = patch.postprocessor.onChanged[name];
+         const newValue = settings.parsed.get(name)?.value;
+
+         writeLog(`Running postprocessor for watch key "${name}" (onChanged): ${func.toString()}`, 3);
+
+         if(typeof func === 'function'){
+            const result = func(parsed.value, newValue, settings, patch, srcWithChanges);
+            if(result !== undefined) parsed.value = result
+         }
+      }
    }
 
+
    /**
-    * @type {Map<string, Map<string, ParsedGameSettingObj>>}
+    * @type {Map<string, ParsedGameSettings>}
     */
    const settingsBySrc = new Map();
-   for(const [key, parsed] of settings.parsed){
+   for(const [key, parsed] of settings.parsed){ // list settings that need to be written
       if(!srcWithChanges.has(parsed.src)) continue;
 
       if(!settingsBySrc.has(parsed.src)) settingsBySrc.set(parsed.src, new Map);
       settingsBySrc.get(parsed.src).set(key, parsed);
+   }
+
+   writeLog(`Sources with changes: ${to.yuString(srcWithChanges)}`, 4);
+
+   for(const src in patch.configSrcMap){ // list settings that need to be written as raw
+      if(!patch.configSrcMap[src].usedAsRaw) continue;
+      if(!srcWithChanges.has(src)) continue;
+
+      settingsBySrc.set(src, null);
    }
 
    for(const [src, _settings] of settingsBySrc){
@@ -2433,7 +2485,9 @@ async function writeSettings(){
          switch(srcConfig.dataType){
             case 'JSON':
             case 'ini':
-               await handler.writeIniKeyVal(fullPath, patch.configSrcMap[src], _settings);
+               if(patch.configSrcMap[src].usedAsRaw)
+                  await handler.writeIniKeyVal_raw(fullPath, patch.configSrcMap[src], srcConfig.value);
+               else await handler.writeIniKeyVal(fullPath, patch.configSrcMap[src], _settings);
                break;
             case 'KBTupleMap':
                await handler.writeKBTupleMap(fullPath, _settings, patch, settings.allRawSettings);

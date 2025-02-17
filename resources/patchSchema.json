@@ -13,7 +13,8 @@
             "userSettings",
             "inputSettings",
             "advanceSettings",
-            "combinedAction"
+            "combinedAction",
+            "engineSettings"
          ]
       },
       "SettingSrcDataType": {
@@ -408,6 +409,17 @@
                "$ref": "#/definitions/OptionPatch"
             }
          }
+      },
+      "postprocessor": {
+         "type": "object",
+         "title": "Write Postprocessor",
+         "description": "postprocessor function to use when writing the source file (this function will be used to map the setting object to raw data)\n\n available values:\n\n - `<$func>`: use custom map function defined with syntax `$func:<functionBody>` with four parameters `oldValue`, `newValue`, `settings`, `patch`, return anything other than `undefined` will be used as the new value.",
+         "anyOf": [
+            {
+               "title": "Write Postprocessor - Custom Postprocessor",
+               "pattern": "^\\$func:"
+            }
+         ]
       },
       "bindingsDeclaration": {
          "type": "object",
