@@ -545,6 +545,9 @@ async function loadKBTupleMap(configPath, settingSrc) {
       // +2 and -1 are to remove the () from the tuple
       let [type, tuple] = [line.slice(0, typeTupleSplit), line.slice(typeTupleSplit + 2, -1)];
 
+      if(settingSrc.manifest?.filter && !predicate(settingSrc.manifest.filter, { type, value: tuple }))
+         continue;
+
       for (const pair of tuple.split(',')) {
          let [pKey, pVal] = pair.split('=');
 
@@ -559,13 +562,18 @@ async function loadKBTupleMap(configPath, settingSrc) {
          thisSetting[pKey] = pVal;
       }
 
-      if(!settings[currGroupName]) settings[currGroupName] = {};
+      if(!settings[currGroupName])
+         settings[currGroupName] = {};
 
-      if(!settings[currGroupName][thisKey]) settings[currGroupName][thisKey] = {
-         type: null,
-         values: []
-      };
-      if(!settings[currGroupName][thisKey].values) settings[currGroupName][thisKey].values = [];
+      if(!settings[currGroupName][thisKey]) {
+         settings[currGroupName][thisKey] = {
+            type: null,
+            values: []
+         };
+      }
+
+      if(!settings[currGroupName][thisKey].values)
+         settings[currGroupName][thisKey].values = [];
 
       // @ts-expect-error
       settings[currGroupName][thisKey].type = type;
@@ -577,7 +585,7 @@ async function loadKBTupleMap(configPath, settingSrc) {
 }
 
 /**
- * load `KBTupleMap` dataType config file
+ * load `Literal` dataType config file
  * @param {string} configPath full path to the config file
  * @param {SettingSrcMetadata} settingSrc
  * @returns {Promise<{[group: string]: any}|null>} a rough parsed object of the config file, where keys in the first level are group names
@@ -662,7 +670,7 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
    }
 
    if(setting?.[settingKey] == undefined){
-      writeLog(`${ncc(color.gold)}[warn]${ncc()} Key "${settingKey}" not found in source config`, 3, true);
+      writeLog(`Key "${settingKey}" not found in source config`, 2, true);
       return null;
    }
 

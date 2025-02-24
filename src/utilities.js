@@ -79,23 +79,39 @@ async function getProcessPath(targetProcess) {
 
 /**
  * @param {string} predicateStr
- * @param {string} value value to be tested
+ * @param {*} value value to be tested
  * @returns {boolean} predicate result
  */
 function predicate(predicateStr, value) {
-   if (predicateStr.startsWith('$regex:')) {
+   if(predicateStr.startsWith('$regex:')) {
       try {
          const regex = new RegExp(predicateStr.slice(7));
          return regex.test(value);
       } catch (e) {
-         throw new Error('Invalid regex');
+         throw new Error('Invalid regex: ' + e.message);
       }
-   } else if (predicateStr.startsWith('$if:')) {
+   }
+   else if(predicateStr.startsWith('$if:')) {
       const eval_s = new Function('key', `return (${predicateStr.slice(4)})`);
       return eval_s(value);
-   } else {
-      return value === predicateStr;
    }
+   else if(predicateStr.startsWith('$type:')) {
+      if (value?.type !== undefined){
+         return value.type === predicateStr.slice(6);
+      }
+
+      const type = predicateStr.slice(6);
+      if (type === 'null') return value === null;
+      if (type === 'array') return Array.isArray(value);
+      if (type === 'object') return typeof value === 'object' && !Array.isArray(value);
+      return typeof value === type;
+   }
+   else if(predicateStr.startsWith('$func:')) {
+      const func = new Function('value', `${predicateStr.slice(6)};return false`);
+      return func(value);
+   }
+
+   return value === predicateStr;
 }
 
 /**

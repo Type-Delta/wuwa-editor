@@ -11,6 +11,10 @@ An advance setting editor for Wuthering Waves, that allows you to change (almost
 
 This program aims to make it easier to change settings that would normally be inaccessible through in-game settings.
 
+> [!IMPORTANT]
+> Due to the changes of how the game handles **Binding** configuration since version `1.4`, features related to modifying **Bindings** and **Axis** will be disabled until the workarounds are found.
+> For more information, please refer to [#1](https://github.com/Type-Delta/wuwa-editor/issues/1)
+
 ![screenshot](./resources/img/program_setting_menu.png)
 
 
@@ -41,9 +45,9 @@ let's quickly get over the features of this program.
 - **Settings Search**: you can search for a setting by name & description, so you don't have to scroll through pages of settings even if you don't know exactly what you are looking for.
 
 ## 📥 Installation
-unfortunately, the program is not yet available as an executable, so you will have to (kinda) build it yourself.
+Unfortunately, the program is not yet available as an executable, so you will have to (kinda) build it yourself.
 
-but DON'T WORRY, no need to touch any code or command line, just a few clicks (and double) and you are done.
+But DON'T WORRY, no need to touch any code or command line, just a few clicks (and double) and you are done.
 
 ### Prerequisites
 to run this program, here is what you need:
@@ -133,7 +137,7 @@ There are 6 types of settings:
 - **number** - a number value as Integer or Float.
 - **string** - a string value.
 - **enum** - a choices to select from a list of values.
-- **bindings** - key bindings for key presses, mouse buttons, and controller buttons. multiple keys can be bound to a single action.
+- **bindings** (unavailable) - key bindings for key presses, mouse buttons, and controller buttons. multiple keys can be bound to a single action.
 - **axis** - similar to **bindings**, but for analog inputs like mouse movement and controller sticks.
 
 of the 6 types, **bindings** and **axis** are the most complicated to work with, so I will explain them in details.
@@ -144,19 +148,7 @@ first, when you select a setting of type **bindings** or **axis**, you will able
 
 select any of the **values** to edit them
 
-##### 🎮 Editing - **Bindings**
-
-there are 3 pages when editing a **binding**
-
-1. edit, add, remove bindings or apply all bindings to current setting. (the image above)
-2. select device type (keyboard, mouse, controller, modifier)
-3. select a key or button to bind
-
-page 3 is where you actually select a key or button, what you select where will show up at the bottom of the screen.
-after that, you can select more keys or modifiers then press `Ctrl+Enter` to apply the current binding. which will take you back to page 1, with values being updated or added.
-
-you can then press `Esc` to go back to the settings menu and edit other settings.
-the changes you just made will automatically be applied (but not saved, you have to do that on the **Main menu**)
+![add binding example](./resources/img/add_keybind.gif)
 
 > [!NOTE]
 > **Differences between `apply` and `save`**
@@ -165,20 +157,7 @@ the changes you just made will automatically be applied (but not saved, you have
 >
 > the **applied** settings will be marked with `[M]` at the end of the setting name.
 
-still confused? let's go through an example.
 
-say we want to change the a binding to keyboard `Ctrl+F+E`, here is how you do it:
-
-1. [page1] select any binding you what to change (to add new one, select `and new binding`).
-2. [page2] select `keyboard` as the device type.
-3. [page3] press `Ctrl+G` to enter key recording mode, then press `F`
-4. [page3] press `Ctrl+G` again, then press `E`
-5. [page3] we still missing a `Ctrl` modifier, let's go back to page 2 by pressing `Esc`
-6. [page2] now select `modifier` as the device type.
-7. [page3] and select `Ctrl` as a modifier key.
-8. [page3] press `Ctrl+Enter` to apply the binding. (done)
-
-![add binding example](./resources/img/add_keybind.gif)
 
 ##### 🕹️ Editing - **Axis** (Axis-type Bindings)
 

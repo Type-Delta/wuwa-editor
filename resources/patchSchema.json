@@ -82,11 +82,11 @@
                "description": "whether the settings in this source file is used as raw data (we shouldn't parse this setting)\nif this setting is set to true, user can't see or directly edit the setting in the editor, but other source may refer use this source as raw data",
                "default": false
             },
-            "configurable": {
+            "disabled": {
                "type": "boolean",
-               "title": "Configurable",
-               "description": "whether the settings in this source file can be configure and modified DIRECTLY by the user (user can see and edit the setting in the editor)",
-               "default": true
+               "title": "Disabled",
+               "description": "whether this source file is disabled (the editor will ignore this source file)",
+               "default": false
             }
          },
          "required": [
@@ -137,11 +137,19 @@
             "filter": {
                "type": "string",
                "title": "Filter",
-               "description": "filter to use when reading the file or database\n\nThe filter can be:\n\n - `$sql:<sqlCondition>`: use SQL condition to filter the data (only used when the source file is a database, this property is ignored otherwise)",
+               "description": "filter to use when reading the file or database\n\nThe filter can be:\n\n - `$sql:<sqlCondition>`: use SQL condition to filter the data (only used when the source file is a database, this property is ignored otherwise)\n - `$type:<typePredicate>`: use type predicate to filter by datatypes\n - `$func:<functionBody>`: use custom filter function defined with syntax `$func:<functionBody>` with one parameter `value` of type any (check handler.js), return true to include the value, false to exclude",
                "anyOf": [
                   {
                      "title": "Filter - SQL Condition",
                      "pattern": "^\\$sql:"
+                  },
+                  {
+                     "title": "Filter - Type Predicate",
+                     "pattern": "^\\$type:"
+                  },
+                  {
+                     "title": "Filter - Custom Filter",
+                     "pattern": "^\\$func:"
                   }
                ]
             },
@@ -301,7 +309,7 @@
             "allowMultiple": {
                "type": "boolean",
                "title": "Allow Multiple",
-               "description": "whether this setting can have multiple values (use only for setting with type 'enum')",
+               "description": "whether this setting can have multiple values (use only for settings that supports it)",
                "default": false
             },
             "editable": {
@@ -340,7 +348,6 @@
                },
                "then": {
                   "required": [
-                     "description",
                      "key",
                      "type",
                      "src"

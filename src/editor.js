@@ -175,7 +175,7 @@ const { color } = _global;
  * @property {string} description a brief description of the source
  * @property {string} path relative path from game root folder to the source file
  * @property {SettingSrcMetadataManifest?} manifest define how setting is parsed and grouped etc. in the source file
- * @property {boolean|undefined} configurable whether the settings in this source file can be configure and modified DIRECTLY by the user (user can see and edit the setting in the editor)
+ * @property {boolean|undefined} disabled whether this source file is disabled (the editor will ignore this source file)
  * @property {boolean|undefined} usedAsRaw whether the settings in this source file is used as raw data (we shouldn't parse this setting)
  */
 
@@ -2010,7 +2010,7 @@ function loadSourceMap(sourceName) {
    const manifest = sourceConfig.manifest;
    if(!manifest) return;
 
-   sourceConfig.configurable = sourceConfig.configurable ?? true;
+   sourceConfig.disabled = sourceConfig.disabled ?? false;
    sourceConfig.usedAsRaw = sourceConfig.usedAsRaw ?? false;
 
    // LINK: @jdn34 Replacer/Reviver syntax
@@ -2177,6 +2177,8 @@ async function loadSettings(skipTFIDFCalculation = false) {
    settings.allRawSettings = new Map();
 
    for (const src in patch.configSrcMap) {
+      if(patch.configSrcMap[src].disabled) continue;
+
       const relPath = patch.configSrcMap[src].path;
       const fullPath = path.resolve(config.gameInstalledPath, relPath);
 
