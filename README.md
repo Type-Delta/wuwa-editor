@@ -7,13 +7,14 @@ banner made with [github-banner](https://github.com/rmariuzzo/github-banner)
 
 # wuwa-editor
 
-An advance setting editor for Wuthering Waves, that allows you to change (almost) any settings of the game without having to edit the game files your self.
+An advance setting editor for Wuthering Waves, that allows you to change (almost) any settings of the game without having to edit the setting files your self.
 
 This program aims to make it easier to change settings that would normally be inaccessible through in-game settings.
 
 > [!IMPORTANT]
-> Unlocking 120 FPS option for Wuthering Waves V2.2 is just available.
-> Full credit of the workaround to [WuWa_Simple_FPSUnlocker](https://github.com/WakuWakuPadoru/WuWa_Simple_FPSUnlocker).
+> Unlocking 120 FPS option for Wuthering Waves version 2.2 is just available and should work even with non-whitelisted CPU/GPU!
+>
+> Full credit to [WuWa_Simple_FPSUnlocker](https://github.com/WakuWakuPadoru/WuWa_Simple_FPSUnlocker) for the workaround.
 
 > [!IMPORTANT]
 > Due to the changes of how the game handles **Binding** configuration since version `1.4`, features related to modifying **Bindings** will be disabled until the workarounds are found.
@@ -67,15 +68,15 @@ that's it, after installing **Node.js**, you are ready to go.
 
 ### 1. Download the Program
 
-donload this project as a zip file by clicking on the green `Code` button then `Download ZIP`.
+Download this project as a zip file by clicking on the green `Code` button then `Download ZIP`.
 
-after downloading, extract the zip file to a folder of your choice.
+After downloading, extract the zip file.
 
 ### 2. Run Install Script
 
-inside the extracted folder, double click and run `install.bat` to install the program.
+Inside the extracted folder, double click and run `install.bat` to install the program.
 
-the script will create a shortcut named "launcher" in this folder, double click on it to run the program.
+The script will create a shortcut named "launcher" in this folder, double click on it to run the program.
 
 > **Note**: if you change the folder name or location, you *might* have to run the `install.bat` script again. (the launcher will ask you to do so, if it failed to locate the program folder)
 
