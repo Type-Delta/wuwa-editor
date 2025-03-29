@@ -1,6 +1,6 @@
 {
   "name": "wuwa-editor",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "edit Wuthering Waves advance settings + unlock FPS",
   "main": "src/editor.js",
   "bin": "src/editor.js",

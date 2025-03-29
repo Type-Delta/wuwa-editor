@@ -25,9 +25,11 @@ const {
    resolveBackupTimestamp,
    restoreBackup,
 } = require('./backup.js');
+const { sqlite } = require('./database.js'); // for postprocessor
 
 
 const { color } = _global;
+const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
 
 
 /**
@@ -160,6 +162,7 @@ const { color } = _global;
  * available values:
  *  - `<$func>`: use custom map function defined with syntax `$func:<functionBody>` with two parameters `key`, `value`, DO NOT return anything, only re-assign to overwrite key or value.
  * @property {boolean} literalTypeParsing whether to parse the values of 'literal' type from 'string' to 'JavaScript types' (only used when setting type is 'literal') (default: false)
+ * @property {boolean} caseSensitive whether the setting key is case sensitive (default: true)
  */
 
 /**
@@ -196,7 +199,7 @@ const { color } = _global;
 
 /**
  * @typedef {Object} PostprocessorPatch
- * @property {{[key: string]: string | (oldValue, newValue, settings: GameSettings, patch: GameSettingPatch) => {} | undefined}?} onChanged postprocessor functions to run before the setting is written to the source file if the setting is modified. The key is the setting name
+ * @property {{[key: string]: string | (oldValue, newValue, settings: GameSettings, patch: GameSettingPatch) => Promise<any> | undefined}?} onChanged postprocessor functions to run before the setting is written to the source file if the setting is modified. The key is the setting name
  */
 
 /**
@@ -1992,7 +1995,7 @@ function loadPatch() {
                continue;
 
             if(patch.postprocessor.onChanged[key].startsWith('$func:')){
-               patch.postprocessor.onChanged[key] = new Function('oldValue, newValue, settings, patch, srcWithChanges',
+               patch.postprocessor.onChanged[key] = new AsyncFunction('oldValue, newValue, settings, patch, srcWithChanges, sqlite',
                   patch.postprocessor.onChanged[key].slice(6)
                );
             }
@@ -2108,8 +2111,8 @@ function loadSourceMap(sourceName) {
       }
    }
 
-   if(manifest.literalTypeParsing == undefined)
-      manifest.literalTypeParsing = false;
+   manifest.literalTypeParsing = manifest.literalTypeParsing ?? false;
+   manifest.caseSensitive = manifest.caseSensitive ?? true;
 }
 
 
@@ -2283,6 +2286,7 @@ async function parseSettings() {
           * config file content type (e.g. ini-keyValue, KBTupleMap, sqlite)
           */
          const optionDataType = patch.configSrcMap[optDecl.src].dataType;
+         const caseSensitive = patch.configSrcMap[optDecl.src].manifest.caseSensitive;
 
          switch (optionDataType) {
             case 'JSON': // same as 'ini'
@@ -2290,7 +2294,8 @@ async function parseSettings() {
                parsedValue = handler.parseIniKeyVal(
                   rawSettings.value,
                   optDecl.key,
-                  rawSettings.src
+                  rawSettings.src,
+                  caseSensitive
                );
                break;
             case 'KBTupleMap':
@@ -2298,7 +2303,8 @@ async function parseSettings() {
                   rawSettings.value,
                   optDecl.key,
                   patch,
-                  combineActionMap
+                  combineActionMap,
+                  caseSensitive
                );
                break;
             case 'literal':
@@ -2306,7 +2312,8 @@ async function parseSettings() {
                   rawSettings.value,
                   optDecl.key,
                   rawSettings.src,
-                  patch.configSrcMap[optDecl.src].manifest.literalTypeParsing
+                  patch.configSrcMap[optDecl.src].manifest.literalTypeParsing,
+                  caseSensitive
                );
                break;
             default:
@@ -2335,7 +2342,7 @@ async function parseSettings() {
 
          switch (parsedValue.type) {
             case 'bool':
-               assert(typeof parsedValue.value === 'boolean', `value \`${parsedValue.key}:${parsedValue.value}\` of type "bool" must be a boolean, instead got ${typeof parsedValue.value}`);
+               assert(typeof parsedValue.value === 'boolean' || ![0, 1].includes(parsedValue.value), `value \`${parsedValue.key}:${parsedValue.value}\` of type "bool" must be a boolean, instead got ${typeof parsedValue.value}`);
                break;
             case 'string': assert(typeof parsedValue.value === 'string', `value \`${parsedValue.key}:${parsedValue.value}\` of type "string" must be a string, instead got ${typeof parsedValue.value}`);
                break;
@@ -2449,7 +2456,7 @@ async function writeSettings(){
          writeLog(`Running postprocessor for watch key "${name}" (onChanged): ${func.toString()}`, 3);
 
          if(typeof func === 'function'){
-            const result = func(parsed.value, newValue, settings, patch, srcWithChanges);
+            const result = await func(parsed.value, newValue, settings, patch, srcWithChanges, sqlite);
             if(result !== undefined) parsed.value = result
          }
       }
@@ -2467,14 +2474,12 @@ async function writeSettings(){
       settingsBySrc.get(parsed.src).set(key, parsed);
    }
 
-   writeLog(`Sources with changes: ${to.yuString(srcWithChanges)}`, 4);
+   // for(const src in patch.configSrcMap){ // list settings that need to be written as raw
+   //    if(!patch.configSrcMap[src].usedAsRaw) continue;
+   //    if(!srcWithChanges.has(src)) continue;
 
-   for(const src in patch.configSrcMap){ // list settings that need to be written as raw
-      if(!patch.configSrcMap[src].usedAsRaw) continue;
-      if(!srcWithChanges.has(src)) continue;
-
-      settingsBySrc.set(src, null);
-   }
+   //    settingsBySrc.set(src, null);
+   // }
 
    for(const [src, _settings] of settingsBySrc){
       const relPath = patch.configSrcMap[src].path;

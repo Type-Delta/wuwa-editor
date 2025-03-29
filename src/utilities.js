@@ -1,6 +1,7 @@
 const exec = require('child_process').exec;
 const execProms = require('util').promisify(exec);
 const fs = require('fs');
+const assert = require('assert');
 
 const commandExists = require('command-exists');
 const path = require('path');
@@ -245,6 +246,44 @@ async function getFileHash(path, algorithm = config.fileDiffHash){
   });
 }
 
+function objInsensitiveGet(obj, key) {
+   if(!obj || !key) return undefined;
+
+   const keys = Object.keys(obj);
+   for(let i = 0; i < keys.length; i++){
+      if(keys[i].toLowerCase() === key.toLowerCase()){
+         return obj[keys[i]];
+      }
+   }
+
+   return undefined;
+}
+
+/**
+ * a simple type check function
+ * @param {any} value
+ * @param {string} type
+ * @param {string} keyName
+ * @param {string} settingType
+ * @throws {Error} if the type is not matched
+ */
+function typeCheck(value, type, keyName, settingType){
+   if(value === undefined||value === null) return;
+
+   switch (type) {
+      case 'bool':
+         assert(typeof value === 'boolean' || ![0, 1].includes(value), `value \`${keyName}:${value}\` of type "bool" must be a boolean, instead got ${typeof value}`);
+         break;
+      case 'string': assert(typeof value === 'string', `value \`${keyName}:${value}\` of type "string" must be a string, instead got ${typeof value}`);
+         break;
+      case 'number':
+      case 'enum': assert(typeof value === 'number', `value \`${keyName}:${value}\` of type "number" or "enum" must be a number, instead got ${typeof value}`);
+         break;
+      default:
+         throw new Error(`[Error] while writing: Type "${type}" is not supported for type "${settingType}". Found in key "${keyName}"`);
+   }
+}
+
 /**
  * A wrapper class for Symbol that acts like a string when not comparing.
  * Can be used as a key in Map, returns its description when converted to string.
@@ -283,5 +322,7 @@ module.exports = {
    canBuildGetIPath,
    resolveGameInstallPath,
    getFileHash,
+   objInsensitiveGet,
+   typeCheck,
    UniqueKey
 }

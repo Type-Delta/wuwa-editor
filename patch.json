@@ -1,6 +1,6 @@
 {
    "$schema": "./resources/patchSchema.json",
-   "gameVersion": "2.1.0",
+   "gameVersion": "2.2.0",
    "patchVersion": 3,
    "handlerVersion": 2,
    "configSrcMap": {
@@ -19,7 +19,10 @@
          "description": "Configure game graphics",
          "path": "./Wuthering Waves Game/Client/Saved/Config/WindowsNoEditor/GameUserSettings.ini",
          "type": "plainText",
-         "dataType": "ini"
+         "dataType": "ini",
+         "manifest": {
+            "caseSensitive": false
+         }
       },
       "advanceSettings": {
          "displayName": "Advance Settings",
@@ -29,9 +32,8 @@
          "dataType": "literal",
          "manifest": {
             "acceptedGroups": [],
-            "filter": "$sql:value not like '[%' and value not like '{%'",
             "readMapper": "$func:value = value === '\"___0B___\"'? false : (value === '\"___1B___\"'? true : value);if(['NvidiaSuperSamplingEnable','NvidiaReflex','MetalFxEnable','FsrEnable','XessEnable'].includes(key)) value = !!parseInt(value, 10);",
-            "writeMapper": "$func:if(['NvidiaSuperSamplingEnable','NvidiaReflex','MetalFxEnable','FsrEnable','XessEnable'].includes(key)) value = value? 1 : 0;value = value === false? '\"___0B___\"' : (value === true? '\"___1B___\"' : value);",
+            "writeMapper": "$func:if(typeof value == 'boolean' && ['NvidiaSuperSamplingEnable','NvidiaReflex','MetalFxEnable','FsrEnable','XessEnable'].includes(key)) value = value? 1 : 0;value = value === false? '\"___0B___\"' : (value === true? '\"___1B___\"' : value);",
             "literalTypeParsing": true,
             "selectedTable": "LocalStorage"
          }
@@ -104,8 +106,15 @@
             "values": [
                [1, "30"],
                [2, "60"],
-               [3, "120"]
-            ]
+               [3, "120"],
+               [120, "120 (literal value)"]
+            ],
+            "valueDesc": {
+               "30": "30 FPS (as preset value)",
+               "60": "60 FPS (as preset value)",
+               "120": "120 FPS (as preset value)\nNOTE: doesn't work after V2.2",
+               "120 (literal value)": "120 FPS (as literal value)\nNOTE: after setting this value, the database will be locked (with TRIGGER) to prevent the game from changing it.\nSet to other value will unlock the database."
+            }
          },
          "HDR": {
             "description": "Enable/Disable HDR. for HDR supported monitors.",
@@ -373,7 +382,8 @@
    },
    "postprocessor": {
       "onChanged": {
-         "Ray Tracing": "$func:if(newValue != 0){let e = settings.allRawSettings.get('engineSettings');e.value['/Script/Engine.RendererRTXSettings'] = {'r.RayTracing':newValue,'r.RayTracing.LimitDevice':0,'r.RayTracing.EnableInGame':1,'r.RayTracing.EnableOnDemand':1,'r.RayTracing.EnableInEditor':1};settings.allRawSettings.set('engineSettings', e);} else {let e = settings.allRawSettings.get('engineSettings');delete e.value['/Script/Engine.RendererRTXSettings'];settings.allRawSettings.set('engineSettings', e);};srcWithChanges.add('engineSettings');"
+         "Ray Tracing": "$func:if(newValue != 0){let e = settings.allRawSettings.get('engineSettings');e.value['/Script/Engine.RendererRTXSettings'] = {'r.RayTracing':newValue,'r.RayTracing.LimitDevice':0,'r.RayTracing.EnableInGame':1,'r.RayTracing.EnableOnDemand':1,'r.RayTracing.EnableInEditor':1};settings.allRawSettings.set('engineSettings', e);} else {let e = settings.allRawSettings.get('engineSettings');delete e.value['/Script/Engine.RendererRTXSettings'];settings.allRawSettings.set('engineSettings', e);};srcWithChanges.add('engineSettings');",
+         "FPS Limit": "$func:if(newValue == 120) {settings.parsed.set('advMenuData', {src:'advanceSettings', key:'MenuData', type: 'string', value: '{\"___MetaType___\": \"___Map___\", \"Content\": [[1, 100], [2, 100], [3, 100], [4, 100], [5, 0], [6, 0], [7, -0.4658685302734375], [10, 3], [11, 3], [20, 0], [21, 0], [22, 0], [23, 0], [24, 0], [25, 0], [26, 0], [27, 0], [28, 0], [29, 0], [30, 0], [31, 0], [32, 0], [33, 0], [34, 0], [35, 0], [36, 0], [37, 0], [38, 0], [39, 0], [40, 0], [41, 0], [42, 0], [43, 0], [44, 0], [45, 0], [46, 0], [47, 0], [48, 0], [49, 0], [50, 0], [51, 1], [52, 1], [53, 0], [54, 3], [55, 1], [56, 2], [57, 1], [58, 1], [59, 1], [61, 0], [62, 0], [63, 1], [64, 1], [65, 0], [66, 0], [67, 3], [68, 2], [69, 100], [70, 100], [79, 1], [81, 0], [82, 1], [83, 1], [84, 0], [85, 0], [87, 0], [88, 0], [89, 50], [90, 50], [91, 50], [92, 50], [93, 1], [99, 0], [100, 30], [101, 0], [102, 1], [103, 0], [104, 50], [105, 0], [106, 0.3], [107, 0], [112, 0], [113, 0], [114, 0], [115, 0], [116, 0], [117, 0], [118, 0], [119, 0], [120, 0], [121, 1], [122, 1], [123, 0], [130, 0], [131, 0], [132, 1], [135, 1], [133, 0]]}'});settings.parsed.set('advPlayMenuInfo', {src:'advanceSettings', key:'PlayMenuInfo', type: 'string', value: '{\"1\": 100, \"2\": 100, \"3\": 100, \"4\": 100, \"5\": 0, \"6\": 0, \"7\": -0.4658685302734375, \"10\": 3, \"11\": 3, \"20\": 0, \"21\": 0, \"22\": 0, \"23\": 0, \"24\": 0, \"25\": 0, \"26\": 0, \"27\": 0, \"28\": 0, \"29\": 0, \"30\": 0, \"31\": 0, \"32\": 0, \"33\": 0, \"34\": 0, \"35\": 0, \"36\": 0, \"37\": 0, \"38\": 0, \"39\": 0, \"40\": 0, \"41\": 0, \"42\": 0, \"43\": 0, \"44\": 0, \"45\": 0, \"46\": 0, \"47\": 0, \"48\": 0, \"49\": 0, \"50\": 0, \"51\": 1, \"52\": 1, \"53\": 0, \"54\": 3, \"55\": 1, \"56\": 2, \"57\": 1, \"58\": 1, \"59\": 1, \"61\": 0, \"62\": 0, \"63\": 1, \"64\": 1, \"65\": 0, \"66\": 0, \"67\": 3, \"68\": 2, \"69\": 100, \"70\": 100, \"79\": 1, \"81\": 0, \"82\": 1, \"83\": 1, \"84\": 0, \"85\": 0, \"87\": 0, \"88\": 0, \"89\": 50, \"90\": 50, \"91\": 50, \"92\": 50, \"93\": 1, \"99\": 0, \"100\": 30, \"101\": 0, \"102\": 1, \"103\": 0, \"104\": 50, \"105\": 0, \"106\": 0.3, \"107\": 0, \"112\": 0, \"113\": 0, \"114\": 0, \"115\": 0, \"116\": 0, \"117\": 0, \"118\": 0, \"119\": 0, \"120\": 0, \"121\": 1, \"122\": 1, \"123\": 0, \"130\": 0, \"131\": 0, \"132\": 1}'});let db = await sqlite.open(patch.configSrcMap['advanceSettings'].path);await db.all(\"DROP TRIGGER IF EXISTS prevent_custom_frame_rate_update;\");await db.all(\"CREATE TRIGGER prevent_custom_frame_rate_update\\nAFTER UPDATE OF value ON LocalStorage\\nWHEN NEW.key = 'CustomFrameRate' AND NEW.value != '120'\\nBEGIN\\n   UPDATE LocalStorage\\n   SET value = 120\\n   WHERE key = 'CustomFrameRate';\\nEND\");db.close();} else {let avs = settings.allRawSettings.get('advanceSettings');if(avs.value['$null']['MenuData'])for([key, val] of settings.parsed){if(val.key == 'MenuData' && val.src == 'advanceSettings'){ settings.parsed.set(key, {src:'advanceSettings', key:'MenuData', type: 'string', value: undefined});break}};if(avs.value['$null']['PlayMenuInfo'])for([key, val] of settings.parsed){if(val.key == 'PlayMenuInfo' && val.src == 'advanceSettings') {settings.parsed.set(key, {src:'advanceSettings', key:'PlayMenuInfo', type: 'string', value: undefined});break}};let db = await sqlite.open(patch.configSrcMap['advanceSettings'].path);await db.all(\"DROP TRIGGER IF EXISTS prevent_custom_frame_rate_update;\");db.close();};"
       }
    },
    "bindingsDeclaration": {

@@ -12,7 +12,11 @@ An advance setting editor for Wuthering Waves, that allows you to change (almost
 This program aims to make it easier to change settings that would normally be inaccessible through in-game settings.
 
 > [!IMPORTANT]
-> Due to the changes of how the game handles **Binding** configuration since version `1.4`, features related to modifying **Bindings** be disabled until the workarounds are found.
+> Unlocking 120 FPS option for Wuthering Waves V2.2 is just available.
+> Full credit of the workaround to [WuWa_Simple_FPSUnlocker](https://github.com/WakuWakuPadoru/WuWa_Simple_FPSUnlocker).
+
+> [!IMPORTANT]
+> Due to the changes of how the game handles **Binding** configuration since version `1.4`, features related to modifying **Bindings** will be disabled until the workarounds are found.
 > For more information, please refer to [#1](https://github.com/Type-Delta/wuwa-editor/issues/1)
 
 ![screenshot](./resources/img/program_setting_menu.png)

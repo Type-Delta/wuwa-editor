@@ -1,15 +1,13 @@
 const fs = require('fs');
-const assert = require('assert');
 const path = require('path');
 
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite');
 const _ = require('lodash');
 
 const to = require('./helper/Tools.js');
 const { color } = require('./global.js');
-const { predicate, writeLog } = require('./utilities.js');
+const { predicate, writeLog, objInsensitiveGet, typeCheck } = require('./utilities.js');
 const config = require('./config.js');
+const { sqlite } = require('./database.js');
 
 const { ncc } = to;
 
@@ -368,18 +366,14 @@ async function readSQLite(filePath, settingSrc){
    let rawSettings = new Map;
    try {
       writeLog(`Opening SQLite database from "${filePath}"`);
-      db = await open({
-         filename: filePath, // absolute path only!
-         driver: sqlite3.Database
-      });
+      db = await sqlite.open(filePath);
 
       if(settingSrc.manifest?.acceptedGroups?.length){
          for(const group of settingSrc.manifest.acceptedGroups){
-            let query = `SELECT key, value FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${group}\'`;
+            let query = `SELECT key, value FROM ${settingSrc.manifest.selectedTable} WHERE key = \'${group}\'`;
             if(settingSrc.manifest?.filter && settingSrc.manifest.filter.startsWith('$sql:'))
                query += ' AND ' + settingSrc.manifest.filter.slice(5);
 
-            writeLog(`executing SQL: \`${query}\``);
             const result = await db.all(query);
 
             if(!result.length){
@@ -401,7 +395,6 @@ async function readSQLite(filePath, settingSrc){
          if(settingSrc.manifest?.filter && settingSrc.manifest.filter.startsWith('$sql:'))
             query += ' WHERE ' + settingSrc.manifest.filter.slice(5);
 
-         writeLog(`executing SQL: \`${query}\``);
          const result = await db.all(query);
 
          if(!result.length){
@@ -430,8 +423,7 @@ async function readSQLite(filePath, settingSrc){
       return null;
 
    } finally {
-      writeLog('Closing SQLite database');
-      db.close();
+      db?.close();
    }
 }
 
@@ -616,18 +608,28 @@ async function loadLiteral(configPath, settingSrc){
  * @param {string} srcFile file path this setting originated from
  * @return {ParsedGameSettingObj|null} parsed setting object
  */
-function parseIniKeyVal(rawSetting, settingKey, srcFile){
+function parseIniKeyVal(rawSetting, settingKey, srcFile, caseSensitive = true){
    let setting = undefined;
    let group = null;
 
-   for(group in rawSetting){
-      if(rawSetting[group][settingKey] !== undefined){
-         setting = rawSetting[group];
-         break;
+   if(caseSensitive){
+      for(group in rawSetting){
+         if(rawSetting[group][settingKey] !== undefined){
+            setting = rawSetting[group];
+            break;
+         }
+      }
+   }
+   else {
+      for(group in rawSetting){
+         if(objInsensitiveGet(rawSetting[group], settingKey) !== undefined){
+            setting = rawSetting[group];
+            break;
+         }
       }
    }
 
-   let value = setting?.[settingKey];
+   let value = caseSensitive? setting?.[settingKey] : objInsensitiveGet(setting, settingKey);
 
    if(value == undefined){
       writeLog(
@@ -659,17 +661,30 @@ function parseIniKeyVal(rawSetting, settingKey, srcFile){
  * @param {*} combineActionMap
  * @return {ParsedGameSettingObj|null} parsed setting object
  */
-function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
+function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap, caseSensitive = true){
    let setting = undefined;
    let group = null;
-   for(group in rawSetting){
-      if(rawSetting[group][settingKey] !== undefined){
-         setting = rawSetting[group];
-         break;
+
+   if(caseSensitive){
+      for(group in rawSetting){
+         if(rawSetting[group][settingKey] !== undefined){
+            setting = rawSetting[group];
+            break;
+         }
+      }
+   }
+   else {
+      for(group in rawSetting){
+         if(objInsensitiveGet(rawSetting[group], settingKey) !== undefined){
+            setting = rawSetting[group];
+            break;
+         }
       }
    }
 
-   if(setting?.[settingKey] == undefined){
+   let value = caseSensitive? setting?.[settingKey] : objInsensitiveGet(setting, settingKey);
+
+   if(value === undefined){
       writeLog(`Key "${settingKey}" not found in source config`, 2, true);
       return null;
    }
@@ -677,10 +692,10 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
    let values = [];
    /**@type {OptionPatchOptionTypes} */
    let type = null;
-   if(setting[settingKey].type === 'AxisMappings'){
+   if(value.type === 'AxisMappings'){
       type = 'axis';
 
-      for(let eachKeybind of setting[settingKey].values){
+      for(let eachKeybind of value.values){
          /**
           * @type {AxisBind}
           */
@@ -726,7 +741,7 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
          })
          : null) ?? [];
 
-      for(let eachKeybind of [...setting[settingKey].values, ...thisCombineAction]){
+      for(let eachKeybind of [...value.values, ...thisCombineAction]){
          // terminal.log(eachKeybind);
          /**
           * @type {KeyBind}
@@ -792,20 +807,30 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap){
  * @param {boolean} typeParsing whether to parse the value to JavaScript type
  * @return {ParsedGameSettingObj|null} parsed setting object
  */
-function parseLiteral(rawSetting, settingKey, srcFile, typeParsing){
+function parseLiteral(rawSetting, settingKey, srcFile, typeParsing, caseSensitive = true){
    let setting = undefined;
    let group = null;
 
-   for(group in rawSetting){
-      if(rawSetting[group][settingKey] !== undefined){
-         setting = rawSetting[group];
-         break;
+   if(caseSensitive){
+      for(group in rawSetting){
+         if(rawSetting[group][settingKey] !== undefined){
+            setting = rawSetting[group];
+            break;
+         }
+      }
+   }
+   else {
+      for(group in rawSetting){
+         if(objInsensitiveGet(rawSetting[group], settingKey) !== undefined){
+            setting = rawSetting[group];
+            break;
+         }
       }
    }
 
-   let value = setting?.[settingKey];
+   let value = caseSensitive? setting?.[settingKey] : objInsensitiveGet(setting, settingKey);
 
-   if(setting?.[settingKey] == undefined){
+   if(value === undefined){
       writeLog(
          `Key "${settingKey}" not found in source config "${srcFile}"`,
          2, true
@@ -839,18 +864,7 @@ function parseLiteral(rawSetting, settingKey, srcFile, typeParsing){
 async function writeIniKeyVal(settingScrPath, settingSrc, settings){
    let noGroup = to.remap(Object.fromEntries(settings),
       (key, value) =>  {
-         switch (value.type) {
-            case 'bool':
-               assert(typeof value.value === 'boolean', `value \`${value.key}:${value.value}\` of type "bool" must be a boolean, instead got ${typeof value.value}`);
-               break;
-            case 'string': assert(typeof value.value === 'string', `value \`${value.key}:${value.value}\` of type "string" must be a string, instead got ${typeof value.value}`);
-               break;
-            case 'number':
-            case 'enum': assert(typeof value.value === 'number', `value \`${value.key}:${value.value}\` of type "number" or "enum" must be a number, instead got ${typeof value.value}`);
-               break;
-            default:
-               throw new Error(`[Error] while writing: Type "${value.type}" is not supported for type "Ini-KeVal". Found in key "${value.key}"`);
-         }
+         typeCheck(value.value, value.type, value.key, "Ini-KeVal");
 
          return {
             key: value.key,
@@ -969,16 +983,12 @@ async function writeSQLite(filePath, settingSrc, settings){
    let db = null;
    try {
       writeLog(`Opening SQLite database from "${filePath}"`);
-      db = await open({
-         filename: filePath, // absolute path only!
-         driver: sqlite3.Database
-      });
-
+      db = await sqlite.open(filePath);
 
       for(const key in settings){
          if(
-            settingSrc.manifest.acceptedGroups.length &&
-            settingSrc.manifest.acceptedGroups.includes(key)
+            settingSrc.manifest.acceptedGroups.includes(key) &&
+            settingSrc.manifest.acceptedGroups.length
          ){
             writeLog(
                `Error writting to SQLite database "${filePath}": the key "${key}" does not exist in settings`, 2
@@ -986,25 +996,24 @@ async function writeSQLite(filePath, settingSrc, settings){
             continue;
          }
 
-         // check if the key exists
-         const res = await db.all(
-            `SELECT key FROM ${settingSrc.manifest.selectedTable} WHERE key == \'${key}\'`
-         );
-
-         if(!res.length){
-            return writeLog(
-               `Error writting to SQLite database "${filePath}": the key "${key}" does not exist in 'key' column in database`, 1
-            );
-         }
-
-         let settingStr = typeof settings[key] == 'string' // the Database only accepts string
+         const strValue = typeof settings[key] == 'string' // the Database only accepts string
             ? settings[key]
             : JSON.stringify(settings[key], settingSrc.manifest.Replacer);
 
-         writeLog(`executing SQL: \`UPDATE ${settingSrc.manifest.selectedTable} SET value = '${settingStr}' WHERE key == '${key}'\``);
-         await db.all(
-            `UPDATE ${settingSrc.manifest.selectedTable} SET value = '${settingStr}' WHERE key == '${key}'`
+         const res = await db.all(
+            `SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key = \'${key}\'`
          );
+         let query = `UPDATE ${settingSrc.manifest.selectedTable} SET value = '${strValue}' WHERE key = '${key}'`;
+
+         if(!res.length){
+            query = `INSERT INTO ${settingSrc.manifest.selectedTable} (key, value) VALUES ('${key}', '${strValue}')`;
+         }
+         else if(settings[key] === undefined){
+            query = `DELETE FROM ${settingSrc.manifest.selectedTable} WHERE key = '${key}'`;
+         }
+         else if(strValue === res[0].value) continue;
+
+         await db.all(query);
       }
    }
    catch (e) {
@@ -1014,7 +1023,6 @@ async function writeSQLite(filePath, settingSrc, settings){
       );
    }
    finally {
-      writeLog('Closing SQLite database');
       db?.close();
    }
 }
@@ -1188,19 +1196,7 @@ async function writeLiteral(settingScrPath, settingSrc, settings, typeParsing){
    let objSettings = to.remap(Object.fromEntries(settings),
       (key, value) =>  {
          let settingValue = value.value;
-
-         switch (value.type) {
-            case 'bool':
-               assert(typeof value.value === 'boolean', `value \`${value.key}:${value.value}\` of type "bool" must be a boolean, instead got ${typeof value.value}`);
-               break;
-            case 'string': assert(typeof value.value === 'string', `value \`${value.key}:${value.value}\` of type "string" must be a string, instead got ${typeof value.value}`);
-               break;
-            case 'number':
-            case 'enum': assert(typeof value.value === 'number', `value \`${value.key}:${value.value}\` of type "number" or "enum" must be a number, instead got ${typeof value.value}`);
-               break;
-            default:
-               throw new Error(`[Error] while writing: Type "${value.type}" is not supported for type "literal". Found in key "${value.key}"`);
-         }
+         typeCheck(value.value, value.type, key, "Literal");
 
          if(typeof settingSrc.manifest.writeMapper == 'function'){
             const mapped = settingSrc.manifest.writeMapper(key, value.value);
@@ -1211,7 +1207,7 @@ async function writeLiteral(settingScrPath, settingSrc, settings, typeParsing){
          return {
             key: value.key,
             value: {
-               value: typeParsing?  settingValue.toString(): settingValue,
+               value: typeParsing && !(settingValue == undefined || settingValue == null)?  settingValue.toString(): settingValue,
                group: value.group
             }
          }
