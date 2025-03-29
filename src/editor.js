@@ -513,9 +513,9 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
                   break;
                case 'number':
                   if(setting.type == 'enum'){
-                     sValue = ncc(color.gold) + (typeof setting.eValues[0] == 'string'
+                     sValue = ncc(color.gold) + ((typeof setting.eValues[0] == 'string'
                         ? setting.eValues[setting.value]
-                        : setting.eValues.find(v => v[0] == setting.value)[1]);
+                        : setting.eValues.find(v => v[0] == setting.value)[1]) ?? setting.value + ncc(color.gray7) + ' [RAW]');
                      sValue += ncc(color.gray7) + '\nRaw: ' + ncc(color.gray5) + setting.value;
                   }
                   else sValue = ncc(color.aquaPink) + setting.value;
@@ -643,9 +643,9 @@ function drawSettingEditor(
 
          case 'enum':
             if(typeof setting.value == 'number'){
-               sValue = ncc(color.gold) + (typeof setting.eValues[0] == 'string'
+               sValue = ncc(color.gold) + ((typeof setting.eValues[0] == 'string'
                   ? setting.eValues[setting.value]
-                  : setting.eValues.find(v => v[0] == setting.value)[1]);
+                  : setting.eValues.find(v => v[0] == setting.value)[1]) ?? setting.value + ncc(color.gray7) + ' [RAW]');
                leftPanelItems = setting.eValues.map((v, i) => {
                   if(typeof v != 'string') v = v[1];
 
@@ -795,7 +795,7 @@ function drawSettingEditor(
       if(setting.valueDesc&&setting.eValues){
          selectedEValue = typeof setting.eValues[0] == 'string'
             ? setting.eValues[choiceIndex]
-            : setting.eValues.find(v => v[0] == choiceIndex)[1];
+            : setting.eValues[choiceIndex][1];
       }
 
       rightPanelContent = ncc(color.gray7) + setting.description + '\n\n' +
@@ -829,7 +829,7 @@ function drawSettingEditor(
          disp.push(
             ncc(color.gray1, 'bg')+ncc(color.gray7)+'░ '+ncc(color.gray3, 'bg')+ncc(color.grayB)+ncc('Bright')+to.padEnd(` •${item}`, terminalHalf - 3, ' ', 2)+ncc()+ncc(color.gray1, 'bg')+ncc(color.gray7)+' '
          );
-      }else disp.push(ncc(color.gray1, 'bg')+ncc(color.gray7)+'░ '+(rightPanelActive?ncc('Dim'):'')+to.padEnd(` ${item}`, terminalHalf - 2, ' ', 1));
+      }else disp.push(ncc()+ncc(color.gray1, 'bg')+ncc(color.gray7)+'░ '+(rightPanelActive?ncc('Dim'):'')+to.padEnd(` ${item}`, terminalHalf - 2, ' ', 1));
    }
 
    while(disp.length < maxRow)
@@ -1254,7 +1254,8 @@ async function showSettingEditMenu(settingsMap, settingIndex){
             break;
          case 'enum':
             if(typeof setting.eValues[0] == 'string')
-               choiceIndex = setting.catergory;
+               choiceIndex = setting.value < setting.eValues.length && setting.value >= 0
+                  ? setting.value : -1;
             else choiceIndex = setting.eValues.findIndex(v => v[0] == setting.value);
             break;
          case 'number':
