@@ -7,7 +7,7 @@ banner made with [github-banner](https://github.com/rmariuzzo/github-banner)
 
 # wuwa-editor
 
-An advance setting editor for Wuthering Waves, that allows you to change (almost) any settings of the game without having to edit the setting files your self.
+An advance setting editor for Wuthering Waves, that allows you to change (almost) any settings without having to edit the setting files your self.
 
 This program aims to make it easier to change settings that would normally be inaccessible through in-game settings.
 
@@ -168,7 +168,7 @@ select any of the **values** to edit them
 
 editing an **axis** is similar to **bindings**, but an additional step to select **input type** (not to be confused with **device type**).
 
-there are 3 pages when editing a **axis**
+there are 3 pages when editing an **axis**
 
 1. edit, add, remove (axis-type) bindings or apply all bindings to current setting. (the image above)
 2. select input type **Binding**, **Axis** or **Set Scaling** (not exactly an input type, ik but bear with me)
