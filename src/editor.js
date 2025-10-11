@@ -14,23 +14,16 @@ const {
    closeLogFile,
    writeLog,
    resolveGameInstallPath,
-   UniqueKey
+   UniqueKey,
 } = require('./utilities.js');
 const terminal = require('./term.js');
 const handler = require('./handler.js');
 const _global = require('./global.js');
-const {
-   createBackup,
-   getBackupList,
-   resolveBackupTimestamp,
-   restoreBackup,
-} = require('./backup.js');
+const { createBackup, getBackupList, resolveBackupTimestamp, restoreBackup } = require('./backup.js');
 const { sqlite } = require('./database.js'); // for postprocessor
 
-
 const { color } = _global;
-const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
-
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 /**
  * @import {KeyBind, AxisBind} from './handler.js'
@@ -38,11 +31,11 @@ const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
 
 /**
  * @typedef {'LCtrl'|'RCtrl'|'LShift'|'RShift'|'Space'|'LAlt'|'RAlt'|'Tab'|'1'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9'|'0'|'Left'|'Right'|'Up'|'Down'|'Enter'|'Backspace'|'Esc'|'Del'|'Middle'|'Forward'|'Backward'|'RSB'|'LSB'|'LT'|'RT'|'LB'|'RB'|'B'|'X'|'Y'|'A'|'DPad_Down'|'DPad_Right'|'DPad_Left'|'DPad_Up'|'Start'|'Back'|'LS_Up'|'LS_Right'|'LS_Left'|'LS_Down'|'RS_Up'|'RS_Right'|'RS_Left'|'RS_Down'} Keys
-*/
+ */
 
 /**
  * @typedef {Keys|'MouseX'|'MouseY'|'MouseWheel'|'MousePos'|'LT_Axis'|'RT_Axis'|'LS_H'|'LS_V'|'LS_B'|'RS_H'|'RS_V'|'RS_B'} Axis
-*/
+ */
 
 /**
  * @typedef {'Shift'|'Ctrl'|'Alt'|'Cmd'} Modifiers
@@ -87,7 +80,7 @@ const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
  * the **key** is the setting name (not to be contused with keyName) in the patch.json
  *
  * @typedef {Map<UniqueKey, ParsedGameSettingObj>} ParsedGameSettings
-*/
+ */
 
 /**
  * @typedef {Map<string, {
@@ -96,7 +89,6 @@ const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
  *    src: string
  * }>} AllRawSettings categorized by source file
  */
-
 
 /**
  * @typedef {Object} ParsedGameSettingObj
@@ -114,7 +106,7 @@ const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
  * @property {boolean} modified setting value has been modified
  * @property {string} group setting group name in the src file (this name identifies what group the setting should be written back to)
  * @property {boolean} editable whether user can edit this setting
-*/
+ */
 
 /**
  * @typedef {Object} SettingSrcMetadataSettingGroups
@@ -218,10 +210,6 @@ const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
  *
  */
 
-
-
-
-
 class GameSettings {
    /**
     * raw settings without declaration
@@ -241,7 +229,6 @@ class GameSettings {
     */
    allRawSettings = null;
 }
-
 
 // tracer.liveLog = true;
 // tracer.attachTracer(to, 'Tools.');
@@ -263,10 +250,8 @@ let changesBackup = new Map();
 let shuttingDown = false;
 let hasErrorOrWarning = false;
 
-
-
-terminal.on('code', async (code) => {
-   if(code == terminal.codes.CLOSE) {
+terminal.on('code', async code => {
+   if (code == terminal.codes.CLOSE) {
       exitProgram();
    }
 });
@@ -276,19 +261,16 @@ process.on('beforeExit', exitProgram);
 (async () => {
    await doStartupTask();
 
-   if(!_global.isThisProcessElevated){
-      terminal.log(
-         `${ncc('Red')}[error]${ncc()} This program must be run as administrator`
-      );
+   if (!_global.isThisProcessElevated) {
+      terminal.log(`${ncc('Red')}[error]${ncc()} This program must be run as administrator`);
       return exitProgram(1);
    }
 
-   checkInstalledPath:
-   if(!config.gameInstalledPath){
+   checkInstalledPath: if (!config.gameInstalledPath) {
       writeLog('No game folder set. Looking for it in process list...', 3, true);
       const isRunning = await isProcessRunning(config.gameClientName);
 
-      if(!isRunning){
+      if (!isRunning) {
          writeLog('Game not found in process list.');
          terminal.log(`${ncc(color.mikuCyan)}[info]${ncc()} Game not found in process list.
 
@@ -302,15 +284,14 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
          if (choice == 1) {
             await promptForGamePath();
             break checkInstalledPath;
-         }
-         else {
+         } else {
             terminal.log(
                `Waiting for you to run the game... ;) (${ncc(color.mikuCyan)}Ctrl+C${ncc('Reset')} to exit)`
             );
 
             let dotCount = 0;
             while (true) {
-               if(dotCount == 0){
+               if (dotCount == 0) {
                   const isRunning = await isProcessRunning(config.gameClientName);
                   if (isRunning) {
                      terminal.clearLine();
@@ -328,7 +309,7 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
       }
 
       const imagePath = await getProcessPath(config.gameClientName);
-      if(!imagePath){
+      if (!imagePath) {
          writeLog('Failed to resolve game path.', 2, true);
          terminal.log(`please enter the game folder manually.`);
 
@@ -341,22 +322,17 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
       writeLog(`Game path found: ${config.gameInstalledPath}`, 3);
    }
 
-   if (!verifyGamePath(config.gameInstalledPath))
-      return exitProgram(1);
+   if (!verifyGamePath(config.gameInstalledPath)) return exitProgram(1);
 
-   const [ loadSettingsRes ] = await Promise.all([
-      loadSettings(),
-      backupGameConfigSrc()
-   ]);
+   const [loadSettingsRes] = await Promise.all([loadSettings(), backupGameConfigSrc()]);
 
    const { settingSearchFields, settingTFIDF } = loadSettingsRes;
 
-   if(hasErrorOrWarning){
+   if (hasErrorOrWarning) {
       await terminal.prompt(
          `${ncc('Red')}[warn]${ncc()} There are errors or warnings when loading, do you wish to continue? \nPress ${ncc(color.mikuCyan)}Enter${ncc()} to continue...`
       );
-   }
-   else await to.asyncSleep(500);
+   } else await to.asyncSleep(500);
 
    hasErrorOrWarning = false;
    writeLog('Loading UI...', 3, true);
@@ -366,18 +342,6 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
    await showMainMenu(settingTFIDF, settingSearchFields);
    exitProgram();
 })();
-
-
-
-
-
-
-
-
-
-
-
-
 
 /**
  * @typedef {Object} WriteUI_splitScreenOptions
@@ -393,48 +357,49 @@ ${ncc(color.mikuCyan)}Manual${ncc()} - Manually enter game folder
  * @param {string[]} [statusBar=['', '']] status bar message (left and right side)
  * @param {WriteUI_splitScreenOptions} [options={}]
  */
-function writeUI_splitScreen(
-   header,
-   leftPanel,
-   rightPanel,
-   footer = '',
-   statusBar = ['', ''],
-   options = {}
-){
+function writeUI_splitScreen(header, leftPanel, rightPanel, footer = '', statusBar = ['', ''], options = {}) {
    const terminalHalf = terminal.width >> 1;
    const { rightPanelActive = true, redundancyLvList = [2, 0, 1] } = options;
-   const lPanelBlank = ncc(color.gray1, 'bg')+ncc(color.gray7) + '░'.padEnd(terminalHalf);
+   const lPanelBlank = ncc(color.gray1, 'bg') + ncc(color.gray7) + '░'.padEnd(terminalHalf);
 
    leftPanel.unshift(lPanelBlank);
 
-   while(leftPanel.length < terminal.height - 3)
-      leftPanel.push(lPanelBlank);
+   while (leftPanel.length < terminal.height - 3) leftPanel.push(lPanelBlank);
 
    terminal.clearScreen();
    terminal.display(
-      ncc(color.gray3, 'bg')+ncc(color.gray9)+ncc('Bright') + `░${header}░` + ncc(),
-      'left', 0
+      ncc(color.gray3, 'bg') + ncc(color.gray9) + ncc('Bright') + `░${header}░` + ncc(),
+      'left',
+      0
    );
    terminal.cursorTo(0, 1);
 
-   for(let j = 0; j < leftPanel.length; j++){
+   for (let j = 0; j < leftPanel.length; j++) {
       let rightPanelLine = null;
-      if(j == 0){
-         rightPanelLine = (rightPanelActive? ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7):'') + `  ${''.padEnd(terminalHalf - 2)}░` + ncc();
-
-      }else{
-         if(j == leftPanel.length - 1){
-            if(rightPanel.length > leftPanel.length){
-               rightPanelLine = (rightPanelActive? ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7):'') +
-                  `│ ${'...'.padEnd(terminalHalf - 2)}░` + ncc();
+      if (j == 0) {
+         rightPanelLine =
+            (rightPanelActive ? ncc('Reset') + ncc(color.gray1, 'bg') + ncc(color.gray7) : '') +
+            `  ${''.padEnd(terminalHalf - 2)}░` +
+            ncc();
+      } else {
+         if (j == leftPanel.length - 1) {
+            if (rightPanel.length > leftPanel.length) {
+               rightPanelLine =
+                  (rightPanelActive ? ncc('Reset') + ncc(color.gray1, 'bg') + ncc(color.gray7) : '') +
+                  `│ ${'...'.padEnd(terminalHalf - 2)}░` +
+                  ncc();
                continue;
             }
 
-            rightPanelLine = (rightPanelActive? ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7):'') +
-               `  ${to.padEnd(rightPanel[j - 1] ?? '', terminalHalf - 2, ' ', redundancyLvList[0])}░` + ncc();
-         }else{
-            rightPanelLine = (rightPanelActive? ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7):'') +
-               `│ ${to.padEnd(rightPanel[j - 1] ?? '', terminalHalf - 2, ' ', redundancyLvList[0])}░` + ncc();
+            rightPanelLine =
+               (rightPanelActive ? ncc('Reset') + ncc(color.gray1, 'bg') + ncc(color.gray7) : '') +
+               `  ${to.padEnd(rightPanel[j - 1] ?? '', terminalHalf - 2, ' ', redundancyLvList[0])}░` +
+               ncc();
+         } else {
+            rightPanelLine =
+               (rightPanelActive ? ncc('Reset') + ncc(color.gray1, 'bg') + ncc(color.gray7) : '') +
+               `│ ${to.padEnd(rightPanel[j - 1] ?? '', terminalHalf - 2, ' ', redundancyLvList[0])}░` +
+               ncc();
          }
       }
 
@@ -442,15 +407,15 @@ function writeUI_splitScreen(
    }
 
    terminal.write(
-      ncc(color.gray3, 'bg')+ncc(color.gray9) + `░ ${to.strJustify(footer, terminal.width - 4, {align: 'left', overflow: 'collapse', collapseLocation: 'end', redundancyLv: redundancyLvList[1]})+ncc(color.gray9)} ░\n` +
-      ncc(color.gray3, 'bg')+ncc(color.gray9) + `░ ${to.strJustify(statusBar, terminal.width - 4, {align: 'spacebetween', overflow: 'collapse', collapseLocation: 'mid', redundancyLv: redundancyLvList[2]})+ncc(color.gray9)} ░` + ncc()
+      ncc(color.gray3, 'bg') +
+         ncc(color.gray9) +
+         `░ ${to.strJustify(footer, terminal.width - 4, { align: 'left', overflow: 'collapse', collapseLocation: 'end', redundancyLv: redundancyLvList[1] }) + ncc(color.gray9)} ░\n` +
+         ncc(color.gray3, 'bg') +
+         ncc(color.gray9) +
+         `░ ${to.strJustify(statusBar, terminal.width - 4, { align: 'spacebetween', overflow: 'collapse', collapseLocation: 'mid', redundancyLv: redundancyLvList[2] }) + ncc(color.gray9)} ░` +
+         ncc()
    );
 }
-
-
-
-
-
 
 /*
 // Setting page draft
@@ -480,45 +445,45 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
    let halfMaxRow = maxRow >> 1;
    let disp = [];
    const terminalHalfW = terminal.width >> 1;
-   const isCategoryModified = [...changesBackup.values()]
-      .findIndex(v => v.catergory == category) !== -1;
+   const isCategoryModified = [...changesBackup.values()].findIndex(v => v.catergory == category) !== -1;
 
    let i = -1;
    let selDesc = null;
-   for(const [key, setting] of settingsMap){
+   for (const [key, setting] of settingsMap) {
       i++;
 
-      if(selectedIndex > settingsMap.size - halfMaxRow){
-         if(i < settingsMap.size - maxRow) continue;
-
-      }else if(selectedIndex >= halfMaxRow){
-         if(i < selectedIndex - halfMaxRow||i > selectedIndex + halfMaxRow) continue;
+      if (selectedIndex > settingsMap.size - halfMaxRow) {
+         if (i < settingsMap.size - maxRow) continue;
+      } else if (selectedIndex >= halfMaxRow) {
+         if (i < selectedIndex - halfMaxRow || i > selectedIndex + halfMaxRow) continue;
       }
 
-      if(disp.length >= maxRow) break;
+      if (disp.length >= maxRow) break;
 
       const isSettingModified = changesBackup.has(key);
 
-      if(i == selectedIndex){
+      if (i == selectedIndex) {
          let sValue = '';
 
-         if(setting.value instanceof Array)
+         if (setting.value instanceof Array)
             sValue = setting.value?.length
                ? '\n  ' + setting.value.map(v => v.toString()).join('\n  ')
-               : ncc(color.gray6)+'[empty]';
-         else{
-            switch(typeof setting.value){
+               : ncc(color.gray6) + '[empty]';
+         else {
+            switch (typeof setting.value) {
                case 'boolean':
-                  sValue = ncc(setting.value?'Green':'Red') + setting.value;
+                  sValue = ncc(setting.value ? 'Green' : 'Red') + setting.value;
                   break;
                case 'number':
-                  if(setting.type == 'enum'){
-                     sValue = ncc(color.gold) + ((typeof setting.eValues[0] == 'string'
-                        ? setting.eValues[setting.value]
-                        : setting.eValues.find(v => v[0] == setting.value)[1]) ?? setting.value + ncc(color.gray7) + ' [RAW]');
+                  if (setting.type == 'enum') {
+                     sValue =
+                        ncc(color.gold) +
+                        ((typeof setting.eValues[0] == 'string'
+                           ? setting.eValues[setting.value]
+                           : setting.eValues.find(v => v[0] == setting.value)[1]) ??
+                           setting.value + ncc(color.gray7) + ' [RAW]');
                      sValue += ncc(color.gray7) + '\nRaw: ' + ncc(color.gray5) + setting.value;
-                  }
-                  else sValue = ncc(color.aquaPink) + setting.value;
+                  } else sValue = ncc(color.aquaPink) + setting.value;
                   break;
                case 'string':
                default:
@@ -526,37 +491,91 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
             }
          }
 
-         selDesc = ncc(color.grayB)+ncc('Bright')+ key + ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7) + '\n\n' + (setting.description ?? '[No Description provided]') +
-            `\n\nType: ${(setting.type? ncc(color.mikuCyan)+setting.type:ncc('Red')+'Unknown')+ncc(color.gray7)}`+
-            `\nValue: ` + sValue + ncc(color.gray7) +
-            '\nKey: ' + ncc(color.gray5) + setting.key + ncc(color.gray7) +
-            (patch.configSrcMap[setting.src]?.path? '\nSrc: ' + ncc(color.gray5) + to.strLimit(patch.configSrcMap[setting.src].path, terminalHalfW - 9, 'start') + ncc(color.gray7): '');
-
+         selDesc =
+            ncc(color.grayB) +
+            ncc('Bright') +
+            key +
+            ncc('Reset') +
+            ncc(color.gray1, 'bg') +
+            ncc(color.gray7) +
+            '\n\n' +
+            (setting.description ?? '[No Description provided]') +
+            `\n\nType: ${(setting.type ? ncc(color.mikuCyan) + setting.type : ncc('Red') + 'Unknown') + ncc(color.gray7)}` +
+            `\nValue: ` +
+            sValue +
+            ncc(color.gray7) +
+            '\nKey: ' +
+            ncc(color.gray5) +
+            setting.key +
+            ncc(color.gray7) +
+            (patch.configSrcMap[setting.src]?.path
+               ? '\nSrc: ' +
+                 ncc(color.gray5) +
+                 to.strLimit(patch.configSrcMap[setting.src].path, terminalHalfW - 9, 'start') +
+                 ncc(color.gray7)
+               : '');
 
          disp.push(
-            ncc(color.gray1, 'bg')+ncc(color.gray7)+'░ '+ncc(color.gray3, 'bg')+ncc(color.grayB)+ncc('Bright')+to.padEnd(` •${key + (isSettingModified? ncc()+ncc(color.gray3, 'bg')+ncc('Yellow')+ ' [M]'+ncc(color.gray7):'')}`, terminalHalfW - 3, ' ', 1)+ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7)+' '
+            ncc(color.gray1, 'bg') +
+               ncc(color.gray7) +
+               '░ ' +
+               ncc(color.gray3, 'bg') +
+               ncc(color.grayB) +
+               ncc('Bright') +
+               to.padEnd(
+                  ` •${key + (isSettingModified ? ncc() + ncc(color.gray3, 'bg') + ncc('Yellow') + ' [M]' + ncc(color.gray7) : '')}`,
+                  terminalHalfW - 3,
+                  ' ',
+                  1
+               ) +
+               ncc('Reset') +
+               ncc(color.gray1, 'bg') +
+               ncc(color.gray7) +
+               ' '
          );
-      }
-      else{
+      } else {
          disp.push(
-            ncc(color.gray1, 'bg')+ncc(color.gray7)+to.padEnd(`░  ${key + (isSettingModified? ncc('Yellow')+ ' [M]'+ncc(color.gray7):'')}`, terminalHalfW, ' ', 1)
+            ncc(color.gray1, 'bg') +
+               ncc(color.gray7) +
+               to.padEnd(
+                  `░  ${key + (isSettingModified ? ncc('Yellow') + ' [M]' + ncc(color.gray7) : '')}`,
+                  terminalHalfW,
+                  ' ',
+                  1
+               )
          );
       }
    }
 
-   let descLines = to.strWrap(selDesc, (terminalHalfW) - 2, {mode: 'softboundery', redundancyLv: 2})
+   let descLines = to
+      .strWrap(selDesc, terminalHalfW - 2, { mode: 'softboundery', redundancyLv: 2 })
       .split('\n');
 
    writeUI_splitScreen(
       to.strSurround(
-         category + (isCategoryModified? ncc()+ncc(color.gray3, 'bg')+ncc('Yellow')+ ' ['+ncc('Italic')+'modified'+ncc()+ncc(color.gray3, 'bg')+ncc('Yellow')+']'+ncc(color.gray9):''),
-         ' ', terminal.width - 2
+         category +
+            (isCategoryModified
+               ? ncc() +
+                 ncc(color.gray3, 'bg') +
+                 ncc('Yellow') +
+                 ' [' +
+                 ncc('Italic') +
+                 'modified' +
+                 ncc() +
+                 ncc(color.gray3, 'bg') +
+                 ncc('Yellow') +
+                 ']' +
+                 ncc(color.gray9)
+               : ''),
+         ' ',
+         terminal.width - 2
       ),
       disp,
       descLines,
       footerMsg,
-      statusMsg, {
-         redundancyLvList: [2, 0, 1]
+      statusMsg,
+      {
+         redundancyLvList: [2, 0, 1],
       }
    );
 }
@@ -599,17 +618,16 @@ function drawSettings(category, settingsMap, selectedIndex = 0, footerMsg = '', 
  * @returns {drawSettingEditorTrackers}
  */
 function drawSettingEditor(
-      settingsMap,
-      settingIndex = 0,
-      statusMsg = ['', ''],
-      choiceIndex = 0,
-      trackers = {
-         step: 1,
-         lastSelIndex: 0,
-         selBindingIndex: 0
-      }
-   ){
-
+   settingsMap,
+   settingIndex = 0,
+   statusMsg = ['', ''],
+   choiceIndex = 0,
+   trackers = {
+      step: 1,
+      lastSelIndex: 0,
+      selBindingIndex: 0,
+   }
+) {
    let maxRow = terminal.height - 5;
    let halfMaxRow = maxRow >> 1;
    let disp = [];
@@ -625,47 +643,85 @@ function drawSettingEditor(
    const terminalHalf = terminal.width >> 1;
 
    let j = 0;
-   for(const [key, setting] of settingsMap){
-      if(j++ != settingIndex) continue;
+   for (const [key, setting] of settingsMap) {
+      if (j++ != settingIndex) continue;
 
       selectedSettingName = key;
 
-      let sValue = '', hearderMsg = null;
-      switch(setting.type){
+      let sValue = '',
+         hearderMsg = null;
+      switch (setting.type) {
          case 'bool':
-            sValue = ncc(color.gray3, 'bg') + ncc(choiceIndex?'Green':'Red') + (choiceIndex? 'true': 'false') + ncc('Reset') + ncc(color.gray1, 'bg');
+            sValue =
+               ncc(color.gray3, 'bg') +
+               ncc(choiceIndex ? 'Green' : 'Red') +
+               (choiceIndex ? 'true' : 'false') +
+               ncc('Reset') +
+               ncc(color.gray1, 'bg');
             leftPanelItems = [...settingsMap.keys()];
-            hearderMsg = ncc(color.mikuCyan)+'SPACE'+ncc(color.grayB)+' to toggle this setting';
-            footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, '+ncc(color.mikuCyan)+'SPACE'+ncc(color.gray9)+' toggle value';
-            if(setting.default !== undefined)
-               defaultStr = ncc(setting.default?'Green':'Red') + setting.default;
+            hearderMsg = ncc(color.mikuCyan) + 'SPACE' + ncc(color.grayB) + ' to toggle this setting';
+            footerMsg =
+               ncc(color.mikuCyan) +
+               'Enter' +
+               ncc(color.gray9) +
+               ' to apply, ' +
+               ncc(color.mikuCyan) +
+               'Esc' +
+               ncc(color.gray9) +
+               ' to go back, ' +
+               ncc(color.mikuCyan) +
+               'SPACE' +
+               ncc(color.gray9) +
+               ' toggle value';
+            if (setting.default !== undefined)
+               defaultStr = ncc(setting.default ? 'Green' : 'Red') + setting.default;
             break;
 
          case 'enum':
-            if(typeof setting.value == 'number'){
-               sValue = ncc(color.gold) + ((typeof setting.eValues[0] == 'string'
-                  ? setting.eValues[setting.value]
-                  : setting.eValues.find(v => v[0] == setting.value)[1]) ?? setting.value + ncc(color.gray7) + ' [RAW]');
+            if (typeof setting.value == 'number') {
+               sValue =
+                  ncc(color.gold) +
+                  ((typeof setting.eValues[0] == 'string'
+                     ? setting.eValues[setting.value]
+                     : setting.eValues.find(v => v[0] == setting.value)[1]) ??
+                     setting.value + ncc(color.gray7) + ' [RAW]');
                leftPanelItems = setting.eValues.map((v, i) => {
-                  if(typeof v != 'string') v = v[1];
+                  if (typeof v != 'string') v = v[1];
 
-                  if(i === setting.default)
+                  if (i === setting.default)
                      return v + ncc(color.gold) + ncc('Italic') + ' (default)' + ncc(color.gray7);
 
                   return v + ncc(color.gray7);
                });
                hearderMsg = 'Chose a value from the left panel';
-               footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'W S'+ncc(color.gray9)+' to move';
+               footerMsg =
+                  ncc(color.mikuCyan) +
+                  'Enter' +
+                  ncc(color.gray9) +
+                  ' to apply, ' +
+                  ncc(color.mikuCyan) +
+                  'Esc' +
+                  ncc(color.gray9) +
+                  ' to go back, ' +
+                  ncc(color.mikuCyan) +
+                  '↑ ↓' +
+                  ncc(color.gray9) +
+                  ' or ' +
+                  ncc(color.mikuCyan) +
+                  'W S' +
+                  ncc(color.gray9) +
+                  ' to move';
                leftPIndex = choiceIndex;
                rightPanelActive = false;
 
-               if(setting.default !== undefined){
-                  defaultStr = ncc(color.gold) + (typeof setting.eValues[0] == 'string'
+               if (setting.default !== undefined) {
+                  defaultStr =
+                     ncc(color.gold) +
+                     (typeof setting.eValues[0] == 'string'
                         ? setting.eValues[setting.default]
                         : setting.eValues.find(v => v[0] == setting.default)[1]);
                }
-            }
-            else {
+            } else {
                writeLog(`Invalid setting value type for enum setting\nsetting: ${to.yuString(setting)}`, 2);
                hearderMsg = 'error while parsing setting value';
             }
@@ -674,107 +730,235 @@ function drawSettingEditor(
          case 'number':
             sValue = ncc(color.aquaPink) + setting.value;
             leftPanelItems = [...settingsMap.keys()];
-            if(setting.range&&setting.range.length > 0){
-               if(setting.range.length > 1&&setting.range[0] != null&&setting.range[1] != null)
-                  hearderMsg = `Enter number between ${ncc(color.mikuCyan)+setting.range[0]+ncc(color.grayB)} and ${ncc(color.mikuCyan)+setting.range[1]+ncc(color.grayB)}`;
-               else{
-                  if(setting.range[0] == null)
+            if (setting.range && setting.range.length > 0) {
+               if (setting.range.length > 1 && setting.range[0] != null && setting.range[1] != null)
+                  hearderMsg = `Enter number between ${ncc(color.mikuCyan) + setting.range[0] + ncc(color.grayB)} and ${ncc(color.mikuCyan) + setting.range[1] + ncc(color.grayB)}`;
+               else {
+                  if (setting.range[0] == null)
                      hearderMsg = `Enter number ${ncc(color.mikuCyan)}less than${ncc(color.grayB)} ≤${setting.range[1]}`;
-                  else hearderMsg = `Enter number ${ncc(color.mikuCyan)}greater than${ncc(color.grayB)} ≥${setting.range[0]}`;
+                  else
+                     hearderMsg = `Enter number ${ncc(color.mikuCyan)}greater than${ncc(color.grayB)} ≥${setting.range[0]}`;
                }
-            }
-            else hearderMsg = 'Enter a number for this setting';
+            } else hearderMsg = 'Enter a number for this setting';
 
-            footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back';
+            footerMsg =
+               ncc(color.mikuCyan) +
+               'Enter' +
+               ncc(color.gray9) +
+               ' to apply, ' +
+               ncc(color.mikuCyan) +
+               'Esc' +
+               ncc(color.gray9) +
+               ' to go back';
 
-            if(setting.default !== undefined)
-               defaultStr = ncc(color.aquaPink) + setting.default;
+            if (setting.default !== undefined) defaultStr = ncc(color.aquaPink) + setting.default;
             break;
 
          case 'bindings':
          case 'axis': {
-            switch(trackers.step){
+            switch (trackers.step) {
                case 1: // 1. select, add, remove binding or apply all binding to current setting
                   leftPanelItems = [...settingsMap.keys()];
                   hearderMsg = 'Modify, add or remove bindings';
                   rightPanelActive = true;
                   trackers.selBindingIndex = choiceIndex;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+(choiceIndex < setting.value.length? ncc(color.mikuCyan)+'Ctrl+Backspace'+ncc(color.gray9)+' delete binding, ': '')+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'W S'+ncc(color.gray9)+' to move';
+                  footerMsg =
+                     ncc(color.mikuCyan) +
+                     'Enter' +
+                     ncc(color.gray9) +
+                     ' to select, ' +
+                     ncc(color.mikuCyan) +
+                     'Esc' +
+                     ncc(color.gray9) +
+                     ' back, ' +
+                     (choiceIndex < setting.value.length
+                        ? ncc(color.mikuCyan) + 'Ctrl+Backspace' + ncc(color.gray9) + ' delete binding, '
+                        : '') +
+                     ncc(color.mikuCyan) +
+                     '↑ ↓' +
+                     ncc(color.gray9) +
+                     ' or ' +
+                     ncc(color.mikuCyan) +
+                     'W S' +
+                     ncc(color.gray9) +
+                     ' to move';
                   break;
                case 2: // 2. select "binding", "axis" or "Set Scaling" (for axis type only)
                   leftPanelItems = ['Binding', 'Axis', 'Set Scaling'];
                   hearderMsg = 'Choose control type';
                   rightPanelActive = false;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
+                  footerMsg =
+                     ncc(color.mikuCyan) +
+                     'Enter' +
+                     ncc(color.gray9) +
+                     ' to select, ' +
+                     ncc(color.mikuCyan) +
+                     'Ctrl+Enter' +
+                     ncc(color.gray9) +
+                     ' to apply, ' +
+                     ncc(color.mikuCyan) +
+                     'Backspace' +
+                     ncc(color.gray9) +
+                     ' delete key, ' +
+                     ncc(color.mikuCyan) +
+                     'Esc' +
+                     ncc(color.gray9) +
+                     ' back, ' +
+                     ncc(color.mikuCyan) +
+                     '↑ ↓' +
+                     ncc(color.gray9) +
+                     ' move';
                   break;
                case 3: // 3. select control type (keyboard, mouse, controller, modifier)
-                  leftPanelItems = Object.keys(patch[trackers.bindingInputTypePatchName])
-                     .filter(v => !(v == 'modifiers'&&setting.type == 'axis'));
+                  leftPanelItems = Object.keys(patch[trackers.bindingInputTypePatchName]).filter(
+                     v => !(v == 'modifiers' && setting.type == 'axis')
+                  );
 
-                  hearderMsg = 'Choose input device type' + (setting.type == 'axis'? ' or modifier key': '');
+                  hearderMsg =
+                     'Choose input device type' + (setting.type == 'axis' ? ' or modifier key' : '');
                   rightPanelActive = false;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
+                  footerMsg =
+                     ncc(color.mikuCyan) +
+                     'Enter' +
+                     ncc(color.gray9) +
+                     ' to select, ' +
+                     ncc(color.mikuCyan) +
+                     'Ctrl+Enter' +
+                     ncc(color.gray9) +
+                     ' to apply, ' +
+                     ncc(color.mikuCyan) +
+                     'Backspace' +
+                     ncc(color.gray9) +
+                     ' delete key, ' +
+                     ncc(color.mikuCyan) +
+                     'Esc' +
+                     ncc(color.gray9) +
+                     ' back, ' +
+                     ncc(color.mikuCyan) +
+                     '↑ ↓' +
+                     ncc(color.gray9) +
+                     ' move';
                   break;
-               case 4:  // 4. select control key/axis
-                  leftPanelItems = Object.keys(patch[trackers.bindingInputTypePatchName][trackers.bindingDeviceTypePatchName]);
+               case 4: // 4. select control key/axis
+                  leftPanelItems = Object.keys(
+                     patch[trackers.bindingInputTypePatchName][trackers.bindingDeviceTypePatchName]
+                  );
                   rightPanelActive = false;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to select, '+ncc(color.mikuCyan)+'Ctrl+Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Backspace'+ncc(color.gray9)+' delete key, '+(trackers.bindingDeviceTypePatchName == 'keyboard'? ncc(color.mikuCyan)+'Ctrl+G'+ncc(color.gray9)+' record key, ': '')+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' move';
+                  footerMsg =
+                     ncc(color.mikuCyan) +
+                     'Enter' +
+                     ncc(color.gray9) +
+                     ' to select, ' +
+                     ncc(color.mikuCyan) +
+                     'Ctrl+Enter' +
+                     ncc(color.gray9) +
+                     ' to apply, ' +
+                     ncc(color.mikuCyan) +
+                     'Backspace' +
+                     ncc(color.gray9) +
+                     ' delete key, ' +
+                     (trackers.bindingDeviceTypePatchName == 'keyboard'
+                        ? ncc(color.mikuCyan) + 'Ctrl+G' + ncc(color.gray9) + ' record key, '
+                        : '') +
+                     ncc(color.mikuCyan) +
+                     'Esc' +
+                     ncc(color.gray9) +
+                     ' back, ' +
+                     ncc(color.mikuCyan) +
+                     '↑ ↓' +
+                     ncc(color.gray9) +
+                     ' move';
                   break;
 
                case 5:
                   leftPanelItems = [...settingsMap.keys()];
                   hearderMsg = 'Modify, add or remove bindings';
                   rightPanelActive = true;
-                  footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to confirm,  '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, value default to ' + ncc(color.mikuCyan) + '100%' + ncc(color.gray9);
+                  footerMsg =
+                     ncc(color.mikuCyan) +
+                     'Enter' +
+                     ncc(color.gray9) +
+                     ' to confirm,  ' +
+                     ncc(color.mikuCyan) +
+                     'Esc' +
+                     ncc(color.gray9) +
+                     ' to go back, value default to ' +
+                     ncc(color.mikuCyan) +
+                     '100%' +
+                     ncc(color.gray9);
                   break;
-               case 6:  // 6. key input mode (enter key binding with key press) (only accessible in step 4 with keyboard device type)
-                  leftPanelItems = Object.keys(patch[trackers.bindingInputTypePatchName][trackers.bindingDeviceTypePatchName]);
+               case 6: // 6. key input mode (enter key binding with key press) (only accessible in step 4 with keyboard device type)
+                  leftPanelItems = Object.keys(
+                     patch[trackers.bindingInputTypePatchName][trackers.bindingDeviceTypePatchName]
+                  );
                   rightPanelActive = true;
-                  footerMsg = ncc(color.mikuCyan)+'Press'+ncc(color.gray9)+' any key on your keyboard...,  '+ncc(color.mikuCyan)+'Ctrl+G'+ncc(color.gray9)+' to cancel';
+                  footerMsg =
+                     ncc(color.mikuCyan) +
+                     'Press' +
+                     ncc(color.gray9) +
+                     ' any key on your keyboard...,  ' +
+                     ncc(color.mikuCyan) +
+                     'Ctrl+G' +
+                     ncc(color.gray9) +
+                     ' to cancel';
                   break;
             }
 
+            leftPIndex = rightPanelActive ? settingIndex : choiceIndex;
 
-            leftPIndex = rightPanelActive? settingIndex: choiceIndex;
-
-            if(setting.value instanceof Array){
+            if (setting.value instanceof Array) {
                rightPanelItems = [
                   ...setting.value.map(v => v.toString()),
                   '➕ [add new binding]',
-                  `♻️ [${ncc('Red')}reset all bindings${ncc(color.gray7)}]`
+                  `♻️ [${ncc('Red')}reset all bindings${ncc(color.gray7)}]`,
                ].map((v, i) =>
                   i == trackers.selBindingIndex
-                     ? ncc(color.gray3, 'bg')+ncc(color.grayB)+ncc('Bright')+to.padEnd(` •${v} `, terminalHalf - 4, ' ', 2)+ncc()+ncc(color.gray1, 'bg')+ncc(color.gray7)
+                     ? ncc(color.gray3, 'bg') +
+                       ncc(color.grayB) +
+                       ncc('Bright') +
+                       to.padEnd(` •${v} `, terminalHalf - 4, ' ', 2) +
+                       ncc() +
+                       ncc(color.gray1, 'bg') +
+                       ncc(color.gray7)
                      : ` ${v} `
                );
             }
 
-
-            if(setting.value[trackers.selBindingIndex]){
+            if (setting.value[trackers.selBindingIndex]) {
                let bindingDesc = null;
 
-               switch(trackers.step){
+               switch (trackers.step) {
                   case 4:
-                     bindingDesc = patch.bindingsDescription[
-                        // bindingInputTypePatchName can be either 'bindingsDeclaration' or 'axisDeclaration'
-                        // to get just 'bindings' or 'axis' we slice off the 'Declaration' part
-                        trackers.bindingInputTypePatchName.slice(0, trackers.bindingInputTypePatchName.indexOf('D')) + '.' +
-                        trackers.bindingDeviceTypePatchName + '.' +
-                        leftPanelItems[choiceIndex]
-                     ];
+                     bindingDesc =
+                        patch.bindingsDescription[
+                           // bindingInputTypePatchName can be either 'bindingsDeclaration' or 'axisDeclaration'
+                           // to get just 'bindings' or 'axis' we slice off the 'Declaration' part
+                           trackers.bindingInputTypePatchName.slice(
+                              0,
+                              trackers.bindingInputTypePatchName.indexOf('D')
+                           ) +
+                              '.' +
+                              trackers.bindingDeviceTypePatchName +
+                              '.' +
+                              leftPanelItems[choiceIndex]
+                        ];
                      break;
                   case 3:
-                     bindingDesc = patch.controlTypeDescription[
-                        trackers.bindingInputTypePatchName.slice(0, trackers.bindingInputTypePatchName.indexOf('D')) + '.' +
-                        leftPanelItems[choiceIndex]
-                     ];
+                     bindingDesc =
+                        patch.controlTypeDescription[
+                           trackers.bindingInputTypePatchName.slice(
+                              0,
+                              trackers.bindingInputTypePatchName.indexOf('D')
+                           ) +
+                              '.' +
+                              leftPanelItems[choiceIndex]
+                        ];
                      break;
                   case 2:
                      bindingDesc = to.objValueAt(patch.controlTypeDescription, choiceIndex);
                      break;
                }
-               if(bindingDesc)
-                  hearderMsg = bindingDesc;
+               if (bindingDesc) hearderMsg = bindingDesc;
             }
 
             break;
@@ -785,77 +969,114 @@ function drawSettingEditor(
             sValue = ncc(color.grayB) + setting.value;
             leftPanelItems = [...settingsMap.keys()];
             hearderMsg = 'Enter a new value';
-            footerMsg = ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to apply, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back';
-            if(setting.default !== undefined)
-               defaultStr = ncc(color.grayB) + setting.default;
-            // for string type currently editing value will be set outside this function as `statusMsg[0]`
+            footerMsg =
+               ncc(color.mikuCyan) +
+               'Enter' +
+               ncc(color.gray9) +
+               ' to apply, ' +
+               ncc(color.mikuCyan) +
+               'Esc' +
+               ncc(color.gray9) +
+               ' to go back';
+            if (setting.default !== undefined) defaultStr = ncc(color.grayB) + setting.default;
+         // for string type currently editing value will be set outside this function as `statusMsg[0]`
       }
 
       let selectedEValue;
-      if(setting.valueDesc&&setting.eValues){
-         selectedEValue = typeof setting.eValues[0] == 'string'
-            ? setting.eValues[choiceIndex]
-            : setting.eValues[choiceIndex][1];
+      if (setting.valueDesc && setting.eValues) {
+         selectedEValue =
+            typeof setting.eValues[0] == 'string'
+               ? setting.eValues[choiceIndex]
+               : setting.eValues[choiceIndex][1];
       }
 
-      rightPanelContent = ncc(color.gray7) + setting.description + '\n\n' +
-         (hearderMsg? ncc(color.grayB)+ncc('Bright')+ hearderMsg + ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7): '')  +
-         (setting.editNote? '\n\n'+setting.editNote:'') +
-         (
-            (setting.valueDesc&&setting.eValues)&&setting.valueDesc[selectedEValue]
-            ? '\n\n'+setting.valueDesc[selectedEValue]
-            : ''
-         ) +
-         (defaultStr? '\n\nDefault: ' + defaultStr + ncc(color.gray7): '\n') +
-         `\nValue: ` + (rightPanelItems?'': sValue) + ncc(color.gray7);
+      rightPanelContent =
+         ncc(color.gray7) +
+         setting.description +
+         '\n\n' +
+         (hearderMsg
+            ? ncc(color.grayB) +
+              ncc('Bright') +
+              hearderMsg +
+              ncc('Reset') +
+              ncc(color.gray1, 'bg') +
+              ncc(color.gray7)
+            : '') +
+         (setting.editNote ? '\n\n' + setting.editNote : '') +
+         (setting.valueDesc && setting.eValues && setting.valueDesc[selectedEValue]
+            ? '\n\n' + setting.valueDesc[selectedEValue]
+            : '') +
+         (defaultStr ? '\n\nDefault: ' + defaultStr + ncc(color.gray7) : '\n') +
+         `\nValue: ` +
+         (rightPanelItems ? '' : sValue) +
+         ncc(color.gray7);
    }
-
-
 
    let i = -1;
-   for(const item of leftPanelItems){
+   for (const item of leftPanelItems) {
       i++;
 
-      if(leftPIndex > leftPanelItems.length - halfMaxRow){
-         if(i < leftPanelItems.length - maxRow) continue;
-
-      }else if(leftPIndex >= halfMaxRow){
-         if(i < leftPIndex - halfMaxRow||i > leftPIndex + halfMaxRow) continue;
+      if (leftPIndex > leftPanelItems.length - halfMaxRow) {
+         if (i < leftPanelItems.length - maxRow) continue;
+      } else if (leftPIndex >= halfMaxRow) {
+         if (i < leftPIndex - halfMaxRow || i > leftPIndex + halfMaxRow) continue;
       }
 
-      if(disp.length >= maxRow) break;
+      if (disp.length >= maxRow) break;
 
-      if(!rightPanelActive&&i == leftPIndex){
+      if (!rightPanelActive && i == leftPIndex) {
          disp.push(
-            ncc(color.gray1, 'bg')+ncc(color.gray7)+'░ '+ncc(color.gray3, 'bg')+ncc(color.grayB)+ncc('Bright')+to.padEnd(` •${item}`, terminalHalf - 3, ' ', 2)+ncc()+ncc(color.gray1, 'bg')+ncc(color.gray7)+' '
+            ncc(color.gray1, 'bg') +
+               ncc(color.gray7) +
+               '░ ' +
+               ncc(color.gray3, 'bg') +
+               ncc(color.grayB) +
+               ncc('Bright') +
+               to.padEnd(` •${item}`, terminalHalf - 3, ' ', 2) +
+               ncc() +
+               ncc(color.gray1, 'bg') +
+               ncc(color.gray7) +
+               ' '
          );
-      }else disp.push(ncc()+ncc(color.gray1, 'bg')+ncc(color.gray7)+'░ '+(rightPanelActive?ncc('Dim'):'')+to.padEnd(` ${item}`, terminalHalf - 2, ' ', 1));
+      } else
+         disp.push(
+            ncc() +
+               ncc(color.gray1, 'bg') +
+               ncc(color.gray7) +
+               '░ ' +
+               (rightPanelActive ? ncc('Dim') : '') +
+               to.padEnd(` ${item}`, terminalHalf - 2, ' ', 1)
+         );
    }
 
-   while(disp.length < maxRow)
-      disp.push(ncc(color.gray1, 'bg')+ncc(color.gray7) + '░'.padEnd(terminalHalf));
+   while (disp.length < maxRow)
+      disp.push(ncc(color.gray1, 'bg') + ncc(color.gray7) + '░'.padEnd(terminalHalf));
 
-
-   let RPanelContentLines = to.strWrap(rightPanelContent, (terminalHalf) - 2, {mode: 'softboundery', redundancyLv: 2})
+   let RPanelContentLines = to
+      .strWrap(rightPanelContent, terminalHalf - 2, { mode: 'softboundery', redundancyLv: 2 })
       .split('\n');
 
-   if(rightPanelItems) RPanelContentLines.push(...rightPanelItems);
+   if (rightPanelItems) RPanelContentLines.push(...rightPanelItems);
 
    writeUI_splitScreen(
-      to.strSurround(ncc('Red') + `Editing - ${selectedSettingName}` + ncc(color.gray9), ' ', terminal.width - 2, 1),
+      to.strSurround(
+         ncc('Red') + `Editing - ${selectedSettingName}` + ncc(color.gray9),
+         ' ',
+         terminal.width - 2,
+         1
+      ),
       disp,
       RPanelContentLines,
       footerMsg,
-      statusMsg, {
+      statusMsg,
+      {
          rightPanelActive: rightPanelActive,
-         redundancyLvList: [2, 0, 1]
+         redundancyLvList: [2, 0, 1],
       }
    );
 
    return trackers;
 }
-
-
 
 // menu page draft
 /*
@@ -878,7 +1099,7 @@ function drawSettingEditor(
  * @param {string[]} statusMsg
  * @param {{itemWidth?: number,itemHeight?: number, colCount?: number, rowCount?: number}} [menuProps={}]
  */
-function drawMainMenu(choices, selectedIndex, statusMsg = ['', ''], menuProps = {}){
+function drawMainMenu(choices, selectedIndex, statusMsg = ['', ''], menuProps = {}) {
    const bg7 = ncc(color.gray7, 'bg'),
       g7 = ncc(color.gray7),
       g3 = ncc(color.gray3),
@@ -890,49 +1111,61 @@ function drawMainMenu(choices, selectedIndex, statusMsg = ['', ''], menuProps = 
    let menuElem = [];
    const choiceLayers = choices.map(v => {
       let layers = [];
-      if(v.includes('\n')) layers = [null, ...v.split('\n'), null];
+      if (v.includes('\n')) layers = [null, ...v.split('\n'), null];
       else layers = [null, null, v, null, null];
 
-      while(layers.length < menuProps.itemHeight)
-         layers.push(null);
+      while (layers.length < menuProps.itemHeight) layers.push(null);
       return layers;
    });
    const header = [' - Wuwa Editor', 'version ' + _global.version];
 
-   const {itemWidth, itemHeight, colCount, rowCount} = menuProps;
+   const { itemWidth, itemHeight, colCount, rowCount } = menuProps;
 
    const rowStartOffset = Math.floor(selectedIndex / (colCount * rowCount));
    let choiceIndex = 0;
    let currLine = 0; // similar to layer but doesn't reset for each row
    let colIndex = 0;
    MenuPrep: {
-      for(
-         let row = rowStartOffset;
-         currLine < rowCount * itemHeight;
-         row++
-      ){ // each choice row
-         for(let layer = 0; layer < itemHeight; layer++){ // each layer in a row of choices: layer.size = itemHeight
+      for (let row = rowStartOffset; currLine < rowCount * itemHeight; row++) {
+         // each choice row
+         for (let layer = 0; layer < itemHeight; layer++) {
+            // each layer in a row of choices: layer.size = itemHeight
 
-            for(
+            for (
                choiceIndex = colCount * row, colIndex = 0;
                colIndex++ < Math.min(choices.length, colCount);
                choiceIndex++
-            ){
-               if(!menuElem[currLine]) menuElem[currLine] = '';
+            ) {
+               if (!menuElem[currLine]) menuElem[currLine] = '';
 
-               if(layer == 0||layer == itemHeight - 1){
-                  if(choiceIndex == selectedIndex){
-                     menuElem[currLine] += bg7 + g7 + '░'+''.padEnd(itemWidth - 2) + '░' + reset;
-                  }
-                  else menuElem[currLine] +=  bg3 + g3 + '░' + (' '.padEnd(itemWidth - 2))+ '░' + reset;
+               if (layer == 0 || layer == itemHeight - 1) {
+                  if (choiceIndex == selectedIndex) {
+                     menuElem[currLine] += bg7 + g7 + '░' + ''.padEnd(itemWidth - 2) + '░' + reset;
+                  } else menuElem[currLine] += bg3 + g3 + '░' + ' '.padEnd(itemWidth - 2) + '░' + reset;
                   continue;
                }
 
                let choice = choiceLayers[choiceIndex];
-               if(choiceIndex == selectedIndex){
-                  menuElem[currLine] += bg7 + g7 + '░' + g0 + to.strSurround(choice?.[layer] ?? '', ' ', itemWidth - 2, 2) + g7 + '░' + reset;
-               }
-               else menuElem[currLine] += bg3 + g3 + '░' + g9 + to.strSurround(choice?.[layer] ?? '', ' ', itemWidth - 2, 2) + g3 + '░' + reset;
+               if (choiceIndex == selectedIndex) {
+                  menuElem[currLine] +=
+                     bg7 +
+                     g7 +
+                     '░' +
+                     g0 +
+                     to.strSurround(choice?.[layer] ?? '', ' ', itemWidth - 2, 2) +
+                     g7 +
+                     '░' +
+                     reset;
+               } else
+                  menuElem[currLine] +=
+                     bg3 +
+                     g3 +
+                     '░' +
+                     g9 +
+                     to.strSurround(choice?.[layer] ?? '', ' ', itemWidth - 2, 2) +
+                     g3 +
+                     '░' +
+                     reset;
             }
 
             currLine++;
@@ -942,31 +1175,38 @@ function drawMainMenu(choices, selectedIndex, statusMsg = ['', ''], menuProps = 
 
    // add trimmed content indicators
    menuElem = [
-      rowStartOffset != 0
-         ? g7 + to.strSurround('▲', ' ', colCount * itemWidth, -1): '',
+      rowStartOffset != 0 ? g7 + to.strSurround('▲', ' ', colCount * itemWidth, -1) : '',
       ...menuElem,
       // here choiceIndex is the index of the last choice printed in the screen
       // but because of how for loop works, it will be 1 more than the actual index
-      choiceIndex < choices.length
-         ? g7 + to.strSurround('▼', ' ', colCount * itemWidth, -1): '',
+      choiceIndex < choices.length ? g7 + to.strSurround('▼', ' ', colCount * itemWidth, -1) : '',
    ];
 
    terminal.clearScreen();
    terminal.display(
-      bg3 + g9 + ncc('Bright') + `░ ${to.strJustify(header, terminal.width - 4, { align: 'spacebetween', collapseLocation: 'mid', overflow: 'collapse', redundancyLv: 0 })} ░` + reset,
-      'left', 0
+      bg3 +
+         g9 +
+         ncc('Bright') +
+         `░ ${to.strJustify(header, terminal.width - 4, { align: 'spacebetween', collapseLocation: 'mid', overflow: 'collapse', redundancyLv: 0 })} ░` +
+         reset,
+      'left',
+      0
    );
 
-   terminal.display(
-      menuElem,
-      'center', 'center', {
-         length: itemWidth * colCount,
-      }
-   );
+   terminal.display(menuElem, 'center', 'center', {
+      length: itemWidth * colCount,
+   });
 
    terminal.cursorTo(0, terminal.height - 2);
-   terminal.write(bg3 + g9 + `░ ${to.strJustify(footerMsg, terminal.width - 4, {align: 'left', overflow: 'collapse', collapseLocation: 'end', redundancyLv: 0}) + g9} ░\n` +
-   bg3 + g9 + `░ ${to.strJustify(statusMsg, terminal.width - 4, {align: 'spacebetween', overflow: 'collapse', collapseLocation: 'mid', redundancyLv: 0}) + g9} ░` + reset);
+   terminal.write(
+      bg3 +
+         g9 +
+         `░ ${to.strJustify(footerMsg, terminal.width - 4, { align: 'left', overflow: 'collapse', collapseLocation: 'end', redundancyLv: 0 }) + g9} ░\n` +
+         bg3 +
+         g9 +
+         `░ ${to.strJustify(statusMsg, terminal.width - 4, { align: 'spacebetween', overflow: 'collapse', collapseLocation: 'mid', redundancyLv: 0 }) + g9} ░` +
+         reset
+   );
 
    // TODO: change to terminal.display() for readability: idk why this failed to print ncc('Reset') at the end
    // terminal.display(
@@ -976,54 +1216,77 @@ function drawMainMenu(choices, selectedIndex, statusMsg = ['', ''], menuProps = 
    // );
 }
 
-
-
 /**
  * @param {string[]} backupList
  * @param {string} footerMsg
  * @param {number} selectedIndex
  * @param {string[]} [statusMsg=['', '']]
  */
-function drawRestoreBackupMenu(backupList, selectedIndex, footerMsg, statusMsg = ['', '']){
+function drawRestoreBackupMenu(backupList, selectedIndex, footerMsg, statusMsg = ['', '']) {
    let maxRow = terminal.height - 5;
    let halfMaxRow = maxRow >> 1;
    let disp = [];
    const terminalHalf = terminal.width >> 1;
    const backupDateS = backupList.map(v => {
-      return resolveBackupTimestamp(v)
-         ?.toLocaleString() ?? 'unknown';
+      return resolveBackupTimestamp(v)?.toLocaleString() ?? 'unknown';
    });
-   const title = `${ncc('Bright')}Restore Backup${ncc()+ncc(color.gray3, 'bg')+ncc(color.gray9)} - choose backup to restore`;
+   const title = `${ncc('Bright')}Restore Backup${ncc() + ncc(color.gray3, 'bg') + ncc(color.gray9)} - choose backup to restore`;
 
-   statusMsg[1] = `available backups: ${ncc(color.mikuCyan)+backupList.length+ncc(color.gray9)}`;
+   statusMsg[1] = `available backups: ${ncc(color.mikuCyan) + backupList.length + ncc(color.gray9)}`;
 
    let i = -1;
    let selDesc = null;
-   for(let backupFileNames of backupList){
+   for (let backupFileNames of backupList) {
       i++;
 
       backupFileNames = to.strLimit(backupFileNames.slice(0, -4), terminalHalf - 4, 'end');
 
-      if(selectedIndex > backupList.length - halfMaxRow){
-         if(i < backupList.length - maxRow) continue;
-
-      }else if(selectedIndex >= halfMaxRow){
-         if(i < selectedIndex - halfMaxRow||i > selectedIndex + halfMaxRow) continue;
+      if (selectedIndex > backupList.length - halfMaxRow) {
+         if (i < backupList.length - maxRow) continue;
+      } else if (selectedIndex >= halfMaxRow) {
+         if (i < selectedIndex - halfMaxRow || i > selectedIndex + halfMaxRow) continue;
       }
 
-      if(disp.length >= maxRow) break;
+      if (disp.length >= maxRow) break;
 
-      if(i == selectedIndex){
-         selDesc = ncc(color.grayB)+ncc('Bright')+ 'Backup ' + (i + 1) + ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7) + '\n\n' +
-            '\nTimestamp: ' + ncc(color.gray5) + backupDateS[i] + ncc(color.gray7);
+      if (i == selectedIndex) {
+         selDesc =
+            ncc(color.grayB) +
+            ncc('Bright') +
+            'Backup ' +
+            (i + 1) +
+            ncc('Reset') +
+            ncc(color.gray1, 'bg') +
+            ncc(color.gray7) +
+            '\n\n' +
+            '\nTimestamp: ' +
+            ncc(color.gray5) +
+            backupDateS[i] +
+            ncc(color.gray7);
 
          disp.push(
-            ncc(color.gray1, 'bg')+ncc(color.gray7)+'░ '+ncc(color.gray3, 'bg')+ncc(color.grayB)+ncc('Bright')+to.padEnd(` •${backupFileNames}`, terminalHalf - 3, ' ', 2)+ncc('Reset')+ncc(color.gray1, 'bg')+ncc(color.gray7)+' '
+            ncc(color.gray1, 'bg') +
+               ncc(color.gray7) +
+               '░ ' +
+               ncc(color.gray3, 'bg') +
+               ncc(color.grayB) +
+               ncc('Bright') +
+               to.padEnd(` •${backupFileNames}`, terminalHalf - 3, ' ', 2) +
+               ncc('Reset') +
+               ncc(color.gray1, 'bg') +
+               ncc(color.gray7) +
+               ' '
          );
-      }else disp.push(ncc(color.gray1, 'bg')+ncc(color.gray7)+to.padEnd(`░  ${backupFileNames}`, terminalHalf, ' ', 2));
+      } else
+         disp.push(
+            ncc(color.gray1, 'bg') +
+               ncc(color.gray7) +
+               to.padEnd(`░  ${backupFileNames}`, terminalHalf, ' ', 2)
+         );
    }
 
-   let descLines = to.strWrap(selDesc, (terminalHalf) - 2, {mode: 'softboundery', redundancyLv: 1})
+   let descLines = to
+      .strWrap(selDesc, terminalHalf - 2, { mode: 'softboundery', redundancyLv: 1 })
       .split('\n');
 
    writeUI_splitScreen(
@@ -1031,24 +1294,27 @@ function drawRestoreBackupMenu(backupList, selectedIndex, footerMsg, statusMsg =
       disp,
       descLines,
       footerMsg,
-      statusMsg, {
-         redundancyLvList: [1, 0, 0]
+      statusMsg,
+      {
+         redundancyLvList: [1, 0, 0],
       }
    );
 }
-
-
-
 
 /**
  * @param {string} group
  * @param {ParsedGameSettings} settingsMap
  */
 async function showSettings(group, settingsMap, settingTFIDF, settingSearchFields) {
-   let selectedIndex = 0, footerMsg = '', statusMsg = ['', ''], searchQuery = '';
+   let selectedIndex = 0,
+      footerMsg = '',
+      statusMsg = ['', ''],
+      searchQuery = '';
    let mode = 0; // 0: normal, 1: search, 2: edit
-   let filteredTFIDF = [], filteredSearchFields = [];
-   let filteredSettings = null, matchedSettings = null;
+   let filteredTFIDF = [],
+      filteredSearchFields = [];
+   let filteredSettings = null,
+      matchedSettings = null;
    let totalSSize = settingsMap.size;
    let menuInactive = false;
    /**
@@ -1056,130 +1322,134 @@ async function showSettings(group, settingsMap, settingTFIDF, settingSearchField
     */
    let cursorPos = 0;
 
-   matchedSettings = filteredSettings = new Map([...settingsMap].filter(([key, value], index) => {
-      if(value.catergory !== group) return false;
+   matchedSettings = filteredSettings = new Map(
+      [...settingsMap].filter(([key, value], index) => {
+         if (value.catergory !== group) return false;
 
-      filteredSearchFields.push(settingSearchFields[index]);
-      filteredTFIDF.push(settingTFIDF[index]);
-      return true;
-   }));
+         filteredSearchFields.push(settingSearchFields[index]);
+         filteredTFIDF.push(settingTFIDF[index]);
+         return true;
+      })
+   );
 
    updateSearchFilter();
    updateFooterStatusMsg();
    drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
 
-
    return new Promise((resolve, reject) => {
-      let onKeyListener = null, resizeListener = null;
-      terminal.on('key', onKeyListener = async (key, preventDefault) => {
-         if(menuInactive) return;
-         if(key == terminal.Keys.CTRL_C) return;
+      let onKeyListener = null,
+         resizeListener = null;
+      terminal.on(
+         'key',
+         (onKeyListener = async (key, preventDefault) => {
+            if (menuInactive) return;
+            if (key == terminal.Keys.CTRL_C) return;
 
-         if(mode == 1){ // search mode (after pressing Ctrl+F)
+            if (mode == 1) {
+               // search mode (after pressing Ctrl+F)
+               preventDefault?.();
+
+               if (key == terminal.Keys.ESC || key == terminal.Keys.ENTER) {
+                  // exit search mode but keep the filter
+                  mode = 0;
+                  updateFooterStatusMsg();
+                  drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
+                  terminal.allowedInputs = false;
+                  return;
+               }
+
+               if (key == terminal.Keys.CTRL_F) {
+                  // exit search mode and clear the filter
+                  mode = 0;
+                  searchQuery = '';
+                  updateSearchFilter();
+                  updateFooterStatusMsg();
+                  drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
+                  terminal.allowedInputs = false;
+                  return;
+               }
+
+               if (terminal.Keys.isBackspace(key)) {
+                  if (Math.abs(cursorPos) >= searchQuery.length) return;
+                  if (cursorPos >= 0) searchQuery = searchQuery.slice(0, -1);
+                  else searchQuery = to.strSplice(searchQuery, cursorPos - 1, 1);
+                  updateSearchFilter();
+               } else if (key == terminal.Keys.DELETE) {
+                  if (cursorPos >= 0) return;
+                  searchQuery = to.strSplice(searchQuery, cursorPos++, 1);
+                  updateSearchFilter();
+               } else if (terminal.Keys.isArrow(key)) {
+                  if (key == terminal.Keys.ARROW_LEFT && Math.abs(cursorPos) < searchQuery.length)
+                     cursorPos--;
+                  else if (key == terminal.Keys.ARROW_RIGHT && cursorPos < 0) cursorPos++;
+                  else return;
+               } else if (key.charCodeAt(0) >= 32 && key.charCodeAt(0) <= 126) {
+                  const splitePos = searchQuery.length + cursorPos;
+                  searchQuery = to.strSplice(searchQuery, splitePos, 0, key);
+                  updateSearchFilter();
+               }
+
+               updateFooterStatusMsg();
+               drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
+               return;
+            }
+
             preventDefault?.();
 
-            if(key == terminal.Keys.ESC||key == terminal.Keys.ENTER){ // exit search mode but keep the filter
-               mode = 0;
+            if (key == 's' || key == terminal.Keys.ARROW_DOWN) {
+               if (selectedIndex < matchedSettings.size - 1) selectedIndex++;
+               else selectedIndex = 0;
                updateFooterStatusMsg();
                drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
-               terminal.allowedInputs = false;
-               return;
-            }
-
-            if(key == terminal.Keys.CTRL_F){ // exit search mode and clear the filter
-               mode = 0;
-               searchQuery = '';
-               updateSearchFilter();
+            } else if (key == 'w' || key == terminal.Keys.ARROW_UP) {
+               if (selectedIndex > 0) selectedIndex--;
+               else selectedIndex = matchedSettings.size - 1;
                updateFooterStatusMsg();
                drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
-               terminal.allowedInputs = false;
-               return;
+            } else if (key == terminal.Keys.ESC) {
+               terminal.removeListener('key', onKeyListener);
+               terminal.removeListener('resize', resizeListener);
+               return resolve();
+            } else if (key == terminal.Keys.CTRL_F) {
+               mode = 1;
+               cursorPos = 0;
+               updateFooterStatusMsg();
+               drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
+               terminal.allowedInputs = true;
+            } else if (key == terminal.Keys.ENTER) {
+               updateFooterStatusMsg(); // clear old message from showSettingEditMenu() below
+               menuInactive = true;
+               const msg = await showSettingEditMenu(matchedSettings, selectedIndex);
+               if (msg) statusMsg[1] = msg; // <- this one
+               menuInactive = false;
+               drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
             }
+         })
+      );
 
-            if(terminal.Keys.isBackspace(key)){
-               if(Math.abs(cursorPos) >= searchQuery.length) return;
-               if(cursorPos >= 0) searchQuery = searchQuery.slice(0, -1);
-               else searchQuery = to.strSplice(searchQuery, cursorPos - 1, 1);
-               updateSearchFilter();
-
-            }else if(key == terminal.Keys.DELETE){
-               if(cursorPos >= 0) return;
-               searchQuery = to.strSplice(searchQuery, cursorPos++, 1);
-               updateSearchFilter();
-
-            }else if(terminal.Keys.isArrow(key)){
-               if(key == terminal.Keys.ARROW_LEFT&&Math.abs(cursorPos) < searchQuery.length) cursorPos--;
-               else if(key == terminal.Keys.ARROW_RIGHT&&cursorPos < 0) cursorPos++;
-               else return;
-
-            }else if(key.charCodeAt(0) >= 32 && key.charCodeAt(0) <= 126){
-               const splitePos = searchQuery.length + cursorPos;
-               searchQuery = to.strSplice(searchQuery, splitePos, 0, key);
-               updateSearchFilter();
-            }
-
-            updateFooterStatusMsg();
+      terminal.on(
+         'resize',
+         (resizeListener = () => {
+            if (menuInactive) return;
             drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
-            return;
-         }
-
-
-         preventDefault?.();
-
-         if(key == 's'||key == terminal.Keys.ARROW_DOWN){
-            if(selectedIndex < matchedSettings.size - 1) selectedIndex++;
-            else selectedIndex = 0;
-            updateFooterStatusMsg();
-            drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
-
-         }else if(key == 'w'||key == terminal.Keys.ARROW_UP){
-            if(selectedIndex > 0) selectedIndex--;
-            else selectedIndex = matchedSettings.size - 1;
-            updateFooterStatusMsg();
-            drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
-
-         }else if(key == terminal.Keys.ESC){
-            terminal.removeListener('key', onKeyListener);
-            terminal.removeListener('resize', resizeListener);
-            return resolve();
-
-         }else if(key == terminal.Keys.CTRL_F){
-            mode = 1;
-            cursorPos = 0;
-            updateFooterStatusMsg();
-            drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
-            terminal.allowedInputs = true;
-
-         }else if(key == terminal.Keys.ENTER){
-            updateFooterStatusMsg(); // clear old message from showSettingEditMenu() below
-            menuInactive = true;
-            const msg = await showSettingEditMenu(matchedSettings, selectedIndex);
-            if(msg) statusMsg[1] = msg; // <- this one
-            menuInactive = false;
-            drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
-         }
-      });
-
-      terminal.on('resize', resizeListener = () => {
-         if(menuInactive) return;
-         drawSettings(group, matchedSettings, selectedIndex, footerMsg, statusMsg);
-      });
+         })
+      );
    });
 
-   function updateSearchFilter(){
-      if(!searchQuery){
-         matchedSettings =  filteredSettings;
+   function updateSearchFilter() {
+      if (!searchQuery) {
+         matchedSettings = filteredSettings;
          return;
       }
 
-      const res = to.search(filteredSearchFields, searchQuery, {TF_IDFMaps: filteredTFIDF});
-      if(!res) return;
+      const res = to.search(filteredSearchFields, searchQuery, { TF_IDFMaps: filteredTFIDF });
+      if (!res) return;
 
-      const baseLine = res[0].score * .45;
+      const baseLine = res[0].score * 0.45;
       matchedSettings = new Map();
 
-      for(const result of res){
-         if(result.score < baseLine) break;
+      for (const result of res) {
+         if (result.score < baseLine) break;
 
          const match = [...filteredSettings][result.matchIndex];
          matchedSettings.set(match[0], match[1]);
@@ -1187,29 +1457,72 @@ async function showSettings(group, settingsMap, settingTFIDF, settingSearchField
       selectedIndex = 0;
    }
 
-   function updateFooterStatusMsg(){
+   function updateFooterStatusMsg() {
       let query = searchQuery;
 
-      switch(mode){
+      switch (mode) {
          case 0:
-            footerMsg = ncc(color.mikuCyan)+' Ctrl+F'+ncc(color.gray9)+' search, '+ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to edit, '+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back, '+ncc(color.mikuCyan)+'↑ ↓'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'W S'+ncc(color.gray9)+' to move';
+            footerMsg =
+               ncc(color.mikuCyan) +
+               ' Ctrl+F' +
+               ncc(color.gray9) +
+               ' search, ' +
+               ncc(color.mikuCyan) +
+               'Enter' +
+               ncc(color.gray9) +
+               ' to edit, ' +
+               ncc(color.mikuCyan) +
+               'Esc' +
+               ncc(color.gray9) +
+               ' to go back, ' +
+               ncc(color.mikuCyan) +
+               '↑ ↓' +
+               ncc(color.gray9) +
+               ' or ' +
+               ncc(color.mikuCyan) +
+               'W S' +
+               ncc(color.gray9) +
+               ' to move';
             break;
          case 1:
-            if(query){
-               if(cursorPos == 0){
+            if (query) {
+               if (cursorPos == 0) {
                   query += ncc(color.gray6, 'bg') + ' ' + ncc(color.gray3, 'bg');
-
-               }else{
-                  query = query.slice(0, cursorPos) + ncc(color.gray6, 'bg') + query.at(cursorPos) + ncc(color.gray3, 'bg') + (cursorPos + 1?query.slice(cursorPos + 1):'');
+               } else {
+                  query =
+                     query.slice(0, cursorPos) +
+                     ncc(color.gray6, 'bg') +
+                     query.at(cursorPos) +
+                     ncc(color.gray3, 'bg') +
+                     (cursorPos + 1 ? query.slice(cursorPos + 1) : '');
                }
             }
-            footerMsg = ncc(color.aquaPink) + 'Type' + ncc(color.gray9)+' to search, ' + ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' or '+ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' to exit search, '+ncc(color.mikuCyan)+'Ctrl+F'+ncc(color.gray9)+' to clear';
+            footerMsg =
+               ncc(color.aquaPink) +
+               'Type' +
+               ncc(color.gray9) +
+               ' to search, ' +
+               ncc(color.mikuCyan) +
+               'Esc' +
+               ncc(color.gray9) +
+               ' or ' +
+               ncc(color.mikuCyan) +
+               'Enter' +
+               ncc(color.gray9) +
+               ' to exit search, ' +
+               ncc(color.mikuCyan) +
+               'Ctrl+F' +
+               ncc(color.gray9) +
+               ' to clear';
             break;
       }
 
       statusMsg = [
-         ' Search: '+(searchQuery?ncc(color.mikuCyan)+query:ncc(color.gray6)+`[none]`)+ncc(color.gray9),
-         ncc(color.mikuCyan)+`${matchedSettings.size+ncc(color.gray9)} of ${ncc(color.mikuCyan)+totalSSize+ncc(color.gray9)} settings `
+         ' Search: ' +
+            (searchQuery ? ncc(color.mikuCyan) + query : ncc(color.gray6) + `[none]`) +
+            ncc(color.gray9),
+         ncc(color.mikuCyan) +
+            `${matchedSettings.size + ncc(color.gray9)} of ${ncc(color.mikuCyan) + totalSSize + ncc(color.gray9)} settings `,
       ];
    }
 }
@@ -1219,8 +1532,9 @@ async function showSettings(group, settingsMap, settingTFIDF, settingSearchField
  * @param {ParsedGameSettings} settingsMap
  * @returns {Promise<void|string>} message to show on statusBar below if any
  */
-async function showSettingEditMenu(settingsMap, settingIndex){
-   let lastSelIndex = 0, statusMsg = ['', ''];
+async function showSettingEditMenu(settingsMap, settingIndex) {
+   let lastSelIndex = 0,
+      statusMsg = ['', ''];
    /**
     * cursor position for search function; position count from the right most
     */
@@ -1242,25 +1556,30 @@ async function showSettingEditMenu(settingsMap, settingIndex){
    let settingValueBackup = null;
 
    let j = 0;
-   for(const [key, setting] of settingsMap){
-      if(j++ != settingIndex) continue;
+   for (const [key, setting] of settingsMap) {
+      if (j++ != settingIndex) continue;
 
       selectedSettingName = key;
       selectedSetting = setting;
 
-      switch(selectedSetting.type){
+      switch (selectedSetting.type) {
          case 'bool':
-            choiceIndex = setting.value? 1: 0;
+            choiceIndex = setting.value ? 1 : 0;
             break;
          case 'enum':
-            if(typeof setting.eValues[0] == 'string')
-               choiceIndex = setting.value < setting.eValues.length && setting.value >= 0
-                  ? setting.value : -1;
+            if (typeof setting.eValues[0] == 'string')
+               choiceIndex =
+                  setting.value < setting.eValues.length && setting.value >= 0 ? setting.value : -1;
             else choiceIndex = setting.eValues.findIndex(v => v[0] == setting.value);
             break;
          case 'number':
             textField = setting.value + '';
-            textFieldPrefix = 'Value' + (setting.range?.[0] != undefined?` (range ${ncc(color.mikuCyan)+setting.range[0]+ncc(color.gray6)}..${ncc(color.mikuCyan)+(setting.range[1]??'')+ncc(color.gray9)})`:'') + ': ';
+            textFieldPrefix =
+               'Value' +
+               (setting.range?.[0] != undefined
+                  ? ` (range ${ncc(color.mikuCyan) + setting.range[0] + ncc(color.gray6)}..${ncc(color.mikuCyan) + (setting.range[1] ?? '') + ncc(color.gray9)})`
+                  : '') +
+               ': ';
             textInputMode = true;
             break;
          case 'string':
@@ -1277,7 +1596,7 @@ async function showSettingEditMenu(settingsMap, settingIndex){
       }
    }
 
-   if(selectedSetting == null) return 'Setting not found';
+   if (selectedSetting == null) return 'Setting not found';
 
    updateFooterStatusMsg0();
    drawSettingEditor(settingsMap, settingIndex, statusMsg, choiceIndex, {
@@ -1285,371 +1604,398 @@ async function showSettingEditMenu(settingsMap, settingIndex){
       selBindingIndex,
       lastSelIndex,
       bindingDeviceTypePatchName,
-      bindingInputTypePatchName
+      bindingInputTypePatchName,
    });
 
    return new Promise((resolve, reject) => {
-      let onKeyListener = null, resizeListener = null;
-      terminal.on('key', onKeyListener = async (key, preventDefault) => {
-         if(key == terminal.Keys.CTRL_C) return;
-         preventDefault?.();
+      let onKeyListener = null,
+         resizeListener = null;
+      terminal.on(
+         'key',
+         (onKeyListener = async (key, preventDefault) => {
+            if (key == terminal.Keys.CTRL_C) return;
+            preventDefault?.();
 
-         if(textInputMode){
-            if(forceApply){
-               statusMsg[1] = '';
-               forceApply = false;
-            }
-
-            if(terminal.Keys.isBackspace(key)){
-               if(Math.abs(cursorPos) >= textField.length) return;
-               if(cursorPos >= 0) textField = textField.slice(0, -1);
-               else textField = to.strSplice(textField, cursorPos - 1, 1);
-
-            }else if(key == terminal.Keys.DELETE){
-               if(cursorPos >= 0) return;
-               textField = to.strSplice(textField, cursorPos++, 1);
-
-            }else if(terminal.Keys.isArrow(key)){
-               if(key == terminal.Keys.ARROW_LEFT&&Math.abs(cursorPos) < textField.length) cursorPos--;
-               else if(key == terminal.Keys.ARROW_RIGHT&&cursorPos < 0) cursorPos++;
-               else return;
-
-            }else if(key.charCodeAt(0) >= 32 && key.charCodeAt(0) <= 126){
-               const splitePos = textField.length + cursorPos;
-               textField = to.strSplice(textField, splitePos, 0, key);
-            }
-         }
-
-         if(currentSetStep == 6){ // 6. key input mode (enter key binding with key press)
-            if(key == terminal.Keys.CTRL_G){ // switch off key input mode
-               KBEdit_gotoStep(4);
-
-            }else{
-               let foundKey = false;
-
-               if(key.charCodeAt(0) >= 33 && key.charCodeAt(0) <= 126){
-                  newBinding.append(key.toUpperCase(), 'keyboard');
-                  foundKey = true;
-               }else{
-                  for(const keyMap in terminal.Keys){
-                     if(terminal.Keys[keyMap] !== key) continue;
-
-                     const translation = patch.terminalKeysTranslation[keyMap];
-                     if(!translation) break;
-                     newBinding.append(translation, 'keyboard');
-                     foundKey = true;
-                     break;
-                  }
+            if (textInputMode) {
+               if (forceApply) {
+                  statusMsg[1] = '';
+                  forceApply = false;
                }
 
-               if(!foundKey)
-                  statusMsg[1] = ncc('Red') + 'Invalid key' + ncc(color.gray9);
-               else{
+               if (terminal.Keys.isBackspace(key)) {
+                  if (Math.abs(cursorPos) >= textField.length) return;
+                  if (cursorPos >= 0) textField = textField.slice(0, -1);
+                  else textField = to.strSplice(textField, cursorPos - 1, 1);
+               } else if (key == terminal.Keys.DELETE) {
+                  if (cursorPos >= 0) return;
+                  textField = to.strSplice(textField, cursorPos++, 1);
+               } else if (terminal.Keys.isArrow(key)) {
+                  if (key == terminal.Keys.ARROW_LEFT && Math.abs(cursorPos) < textField.length) cursorPos--;
+                  else if (key == terminal.Keys.ARROW_RIGHT && cursorPos < 0) cursorPos++;
+                  else return;
+               } else if (key.charCodeAt(0) >= 32 && key.charCodeAt(0) <= 126) {
+                  const splitePos = textField.length + cursorPos;
+                  textField = to.strSplice(textField, splitePos, 0, key);
+               }
+            }
+
+            if (currentSetStep == 6) {
+               // 6. key input mode (enter key binding with key press)
+               if (key == terminal.Keys.CTRL_G) {
+                  // switch off key input mode
                   KBEdit_gotoStep(4);
+               } else {
+                  let foundKey = false;
+
+                  if (key.charCodeAt(0) >= 33 && key.charCodeAt(0) <= 126) {
+                     newBinding.append(key.toUpperCase(), 'keyboard');
+                     foundKey = true;
+                  } else {
+                     for (const keyMap in terminal.Keys) {
+                        if (terminal.Keys[keyMap] !== key) continue;
+
+                        const translation = patch.terminalKeysTranslation[keyMap];
+                        if (!translation) break;
+                        newBinding.append(translation, 'keyboard');
+                        foundKey = true;
+                        break;
+                     }
+                  }
+
+                  if (!foundKey) statusMsg[1] = ncc('Red') + 'Invalid key' + ncc(color.gray9);
+                  else {
+                     KBEdit_gotoStep(4);
+                  }
                }
             }
-         }
 
-
-         switch(selectedSetting.type){
-            case 'bool':
-               if(key == terminal.Keys.SPACE||key == terminal.Keys.ARROW_DOWN||key == terminal.Keys.ARROW_UP)
-                  choiceIndex = choiceIndex?0:1;
-
-               else if(key == terminal.Keys.ENTER){
-                  if(selectedSetting.value != choiceIndex){
-                     changesBackup.set(selectedSettingName, _.cloneDeep(selectedSetting));
-                     selectedSetting.value = !!choiceIndex;
+            switch (selectedSetting.type) {
+               case 'bool':
+                  if (
+                     key == terminal.Keys.SPACE ||
+                     key == terminal.Keys.ARROW_DOWN ||
+                     key == terminal.Keys.ARROW_UP
+                  )
+                     choiceIndex = choiceIndex ? 0 : 1;
+                  else if (key == terminal.Keys.ENTER) {
+                     if (selectedSetting.value != choiceIndex) {
+                        changesBackup.set(selectedSettingName, _.cloneDeep(selectedSetting));
+                        selectedSetting.value = !!choiceIndex;
+                        clearListeners();
+                        return resolve(
+                           ncc(color.aquaPink) +
+                              selectedSettingName +
+                              ncc(color.gray9) +
+                              ' updated to ' +
+                              ncc(color.mikuCyan) +
+                              selectedSetting.value +
+                              ncc(color.gray9)
+                        );
+                     }
                      clearListeners();
-                     return resolve(
-                        ncc(color.aquaPink)+selectedSettingName+ncc(color.gray9)+' updated to '+ncc(color.mikuCyan)+selectedSetting.value+ncc(color.gray9)
-                     );
-                  }
-                  clearListeners();
-                  return resolve();
-
-               }else if(key == terminal.Keys.ESC){
-                  clearListeners();
-                  return resolve();
-               }
-               break;
-            case 'enum':
-               if(key == terminal.Keys.ARROW_DOWN||key == 's'){
-                  if(choiceIndex < selectedSetting.eValues.length - 1) choiceIndex++;
-                  else choiceIndex = 0;
-
-               }else if(key == terminal.Keys.ARROW_UP||key == 'w'){
-                  if(choiceIndex > 0) choiceIndex--;
-                  else choiceIndex = selectedSetting.eValues.length - 1;
-
-               }else if(key == terminal.Keys.ENTER){
-                  const isSelectedChanged = typeof selectedSetting.eValues[0] == 'string'
-                     ? selectedSetting.value != choiceIndex
-                     : selectedSetting.value != selectedSetting.eValues[choiceIndex][0];
-
-                  if(isSelectedChanged){
-                     changesBackup.set(selectedSettingName, _.cloneDeep(selectedSetting));
-
-                     if(typeof selectedSetting.eValues[0] == 'string')
-                        selectedSetting.value = choiceIndex;
-                     else selectedSetting.value = selectedSetting.eValues[choiceIndex][0];
-
+                     return resolve();
+                  } else if (key == terminal.Keys.ESC) {
                      clearListeners();
-                     return resolve(
-                        ncc(color.aquaPink)+selectedSettingName+ncc(color.gray9)+' updated to '+ncc(color.mikuCyan)+selectedSetting.eValues[choiceIndex]+ncc(color.gray9)
-                     );
+                     return resolve();
                   }
-                  clearListeners();
-                  return resolve();
-
-               }else if(key == terminal.Keys.ESC){
-                  clearListeners();
-                  return resolve();
-               }
-            case 'number':
-               if(key == terminal.Keys.ENTER){
-                  const num = parseFloat(textField);
-                  if(isNaN(num)){
-                     statusMsg[1] = ncc('Red') + 'Invalid number value' + ncc(color.gray9);
-                     break;
-                  }
-
-                  if(selectedSetting.range?.[0] != undefined&&!forceApply){
-                     if(num < selectedSetting.range[0]||(selectedSetting.range[1] != undefined? num > selectedSetting.range[1]: false)){
-                        statusMsg[1] = ncc(color.gold) + `value out of range${ncc(color.gray9)}, press ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to apply anyways` + ncc(color.gray9);
-                        forceApply = true;
-                        break;
-                     }
-                  }
-
-                  if(selectedSetting.value != num){
-                     changesBackup.set(selectedSettingName, _.cloneDeep(selectedSetting));
-                     selectedSetting.value = num;
-                     clearListeners();
-                     return resolve(
-                        ncc(color.aquaPink)+selectedSettingName+ncc(color.gray9)+' updated to '+ncc(color.mikuCyan)+selectedSetting.value+ncc(color.gray9)
-                     );
-                  }
-                  clearListeners();
-                  return resolve();
-
-               }else if(key == terminal.Keys.ESC){
-                  clearListeners();
-                  return resolve();
-               }
-               break;
-
-            case 'string':
-               if(key == terminal.Keys.ENTER){
-                  if(selectedSetting.value != textField){
-                     changesBackup.set(selectedSettingName, _.cloneDeep(selectedSetting));
-                     selectedSetting.value = textField;
-                     return resolve(
-                        ncc(color.aquaPink)+selectedSettingName+ncc(color.gray9)+' updated to '+ncc(color.mikuCyan)+selectedSetting.value+ncc(color.gray9)
-                     );
-                  }
-                  clearListeners();
-                  return resolve();
-
-               }else if(key == terminal.Keys.ESC){
-                  clearListeners();
-                  return resolve();
-               }
-               break;
-
-            case 'axis':
-            case 'bindings':
-               if((key == terminal.Keys.ARROW_DOWN||key == 's')&&!textInputMode){
-                  if(choiceIndex < choiceIndexMax) choiceIndex++;
-                  else choiceIndex = 0;
-
-               }else if((key == terminal.Keys.ARROW_UP||key == 'w')&&!textInputMode){
-                  if(choiceIndex > 0) choiceIndex--;
-                  else choiceIndex = choiceIndexMax;
-
-               }else if(key == terminal.Keys.ENTER){
-                  switch(currentSetStep){
-                     case 1: // 1. select, add, remove binding or reset all changes to current setting
-                        if(choiceIndex == choiceIndexMax){ // reset setting
-                           selectedSetting.value = settingValueBackup.map(v => v.clone());
-                           statusMsg[1] = ncc('Yellow') + 'All changes discarded' + ncc(color.gray9);
-                           break;
-                        }
-
-                        selBindingIndex = choiceIndex;
-                        bindingInputTypePatchName = 'bindingsDeclaration';
-
-                        if(selBindingIndex < selectedSetting.value.length){
-                           newBinding = selectedSetting.value[selBindingIndex].clone();
-
-                        }else{
-                           newBinding = selectedSetting.type == 'axis'
-                              ? new handler.AxisBind()
-                              : new handler.KeyBind();
-                        }
-
-                        // skip to step 3 for binding type
-                        KBEdit_gotoStep(selectedSetting.type == 'axis'? 2: 3);
-                        break;
-                     case 2: // select input type "binding", "axis" or "set scaling" (for axis binding type only)
-                        if(choiceIndex == 2){ // choose set scaling
-                           KBEdit_gotoStep(5);
-                           break;
-                        }
-
-                        KBEdit_gotoStep(3);
-                        lastSelIndex = choiceIndex;
-                        break;
-                     case 3: // select device type (keyboard, mouse, controller, modifier)
-                        let i = 0;
-                        for(const device in patch[bindingInputTypePatchName]){
-                           // v skip modifier key for axis type
-                           if(selectedSetting.type == 'axis'&&device == 'modifiers') continue;
-                           if(i++ != choiceIndex) continue;
-
-                           bindingDeviceTypePatchName = device;
-                        }
-                        lastSelIndex = choiceIndex;
-                        KBEdit_gotoStep(4);
-                        break;
-                     case 4: { // select binding key/axis
-                        let binding = null;
-                        let i = 0;
-                        for(const key in patch[bindingInputTypePatchName][bindingDeviceTypePatchName]){
-                           if(i++ != choiceIndex) continue;
-                           binding = key;
-                        }
-
-                        if(bindingDeviceTypePatchName == 'modifiers'){
-                           newBinding.setModifier(binding); // w/o second arg is toggle
-                        }else{
-                           newBinding.append(binding, bindingDeviceTypePatchName);
-                        }
-
-                        KBEdit_gotoStep(selectedSetting.type == 'axis'? 2: 3);
-                        break;
-                     }
-                     case 5: { // set axis scaling
-                        const num = parseFloat(textField) / 100;
-                        if(isNaN(num)){
-                           statusMsg[1] = ncc('Red') + 'Invalid number value' + ncc(color.gray9);
-                           break;
-                        }
-
-                        newBinding.scale = num;
-                        KBEdit_gotoStep(2);
-                        break;
-                     }
-                  }
-               }else if(key == terminal.Keys.CTRL_ENTER){
-                  if(newBinding.value == null){
-                     statusMsg[1] = ncc('Red') + 'No binding selected' + ncc(color.gray9);
-                     break;
-                  }
-
-                  if(selBindingIndex < selectedSetting.value.length){
-                     selectedSetting.value[selBindingIndex] = newBinding;
-                     statusMsg[1] = 'Binding modified';
-
-                  }else{
-                     selectedSetting.value.push(newBinding);
-                     statusMsg[1] = 'Binding added';
-                  }
-
-                  newBinding = null;
-                  KBEdit_gotoStep(1);
-
-
-               }else if(terminal.Keys.isBackspace(key)){ // delete a key in current binding
-                  if(textInputMode) break; // text input will be handled above
-
-                  if(newBinding.value != null){
-                     newBinding.pop();
-                  }
-                  else if(newBinding.scale != 1){
-                     newBinding.scale = 1; // we can't just delete the scale value
-                  }
-                  else{
-                     for(const key in newBinding.modifier){
-                        if(newBinding.modifier[key]){
-                           newBinding.modifier[key] = false;
-                           break;
-                        }
-                     }
-                  }
-
-                  textField = newBinding.toString();
-
-               }else if(key == terminal.Keys.CTRL_BACKSPACE){ // delete current binding
-                  if(currentSetStep != 1) break;
-                  if(choiceIndex >= choiceIndexMax - 1) break; // not a binding, do nothing
-
-                  selectedSetting.value.splice(choiceIndex, 1);
-                  choiceIndexMax--;
-                  statusMsg[1] = ncc(color.aquaPink) + 'Binding removed' + ncc(color.gray9);
-
-               }else if(key == terminal.Keys.CTRL_G){ // toggle key input mode
-                  if(currentSetStep != 4) break;
-                  if(bindingDeviceTypePatchName !== 'keyboard') break;
-                  KBEdit_gotoStep(6);
-
-               }else if(key == terminal.Keys.ESC){
-                  if(textInputMode&&currentSetStep == 5){
-                     KBEdit_gotoStep(2); // exit step 5
-                     break;
-                  }
-
-                  if(currentSetStep == 1){
-                     clearListeners();
-
-                     if(_.isEqual(selectedSetting.value, settingValueBackup)){
-                        return resolve('');
-                     }
-
-                     const clone = _.cloneDeep(selectedSetting);
-                     clone.value = settingValueBackup;
-
-                     changesBackup.set(selectedSettingName, clone);
-                     return resolve('Setting updated');
-                  }
-
-                  KBEdit_gotoStep( // skip step 2 for 'bindings' type
-                     currentSetStep - ((selectedSetting.type == 'bindings'&&currentSetStep == 3)? 2: 1)
-                  );
                   break;
-               }
-         }
+               case 'enum':
+                  if (key == terminal.Keys.ARROW_DOWN || key == 's') {
+                     if (choiceIndex < selectedSetting.eValues.length - 1) choiceIndex++;
+                     else choiceIndex = 0;
+                  } else if (key == terminal.Keys.ARROW_UP || key == 'w') {
+                     if (choiceIndex > 0) choiceIndex--;
+                     else choiceIndex = selectedSetting.eValues.length - 1;
+                  } else if (key == terminal.Keys.ENTER) {
+                     const isSelectedChanged =
+                        typeof selectedSetting.eValues[0] == 'string'
+                           ? selectedSetting.value != choiceIndex
+                           : selectedSetting.value != selectedSetting.eValues[choiceIndex][0];
 
-         updateFooterStatusMsg0();
+                     if (isSelectedChanged) {
+                        changesBackup.set(selectedSettingName, _.cloneDeep(selectedSetting));
 
-         lastSelIndex = drawSettingEditor(settingsMap, settingIndex, statusMsg, choiceIndex, {
-            step: currentSetStep,
-            lastSelIndex,
-            selBindingIndex,
-            bindingInputTypePatchName,
-            bindingDeviceTypePatchName
-         }).lastSelIndex;
-      });
+                        if (typeof selectedSetting.eValues[0] == 'string')
+                           selectedSetting.value = choiceIndex;
+                        else selectedSetting.value = selectedSetting.eValues[choiceIndex][0];
 
-      terminal.on('resize', resizeListener = () => {
-         drawSettingEditor(settingsMap, settingIndex, statusMsg, choiceIndex, {
-            step: currentSetStep,
-            lastSelIndex,
-            selBindingIndex,
-            bindingInputTypePatchName,
-            bindingDeviceTypePatchName
-         });
-      });
+                        clearListeners();
+                        return resolve(
+                           ncc(color.aquaPink) +
+                              selectedSettingName +
+                              ncc(color.gray9) +
+                              ' updated to ' +
+                              ncc(color.mikuCyan) +
+                              selectedSetting.eValues[choiceIndex] +
+                              ncc(color.gray9)
+                        );
+                     }
+                     clearListeners();
+                     return resolve();
+                  } else if (key == terminal.Keys.ESC) {
+                     clearListeners();
+                     return resolve();
+                  }
+               case 'number':
+                  if (key == terminal.Keys.ENTER) {
+                     const num = parseFloat(textField);
+                     if (isNaN(num)) {
+                        statusMsg[1] = ncc('Red') + 'Invalid number value' + ncc(color.gray9);
+                        break;
+                     }
 
+                     if (selectedSetting.range?.[0] != undefined && !forceApply) {
+                        if (
+                           num < selectedSetting.range[0] ||
+                           (selectedSetting.range[1] != undefined ? num > selectedSetting.range[1] : false)
+                        ) {
+                           statusMsg[1] =
+                              ncc(color.gold) +
+                              `value out of range${ncc(color.gray9)}, press ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to apply anyways` +
+                              ncc(color.gray9);
+                           forceApply = true;
+                           break;
+                        }
+                     }
 
-      function clearListeners(){
+                     if (selectedSetting.value != num) {
+                        changesBackup.set(selectedSettingName, _.cloneDeep(selectedSetting));
+                        selectedSetting.value = num;
+                        clearListeners();
+                        return resolve(
+                           ncc(color.aquaPink) +
+                              selectedSettingName +
+                              ncc(color.gray9) +
+                              ' updated to ' +
+                              ncc(color.mikuCyan) +
+                              selectedSetting.value +
+                              ncc(color.gray9)
+                        );
+                     }
+                     clearListeners();
+                     return resolve();
+                  } else if (key == terminal.Keys.ESC) {
+                     clearListeners();
+                     return resolve();
+                  }
+                  break;
+
+               case 'string':
+                  if (key == terminal.Keys.ENTER) {
+                     if (selectedSetting.value != textField) {
+                        changesBackup.set(selectedSettingName, _.cloneDeep(selectedSetting));
+                        selectedSetting.value = textField;
+                        return resolve(
+                           ncc(color.aquaPink) +
+                              selectedSettingName +
+                              ncc(color.gray9) +
+                              ' updated to ' +
+                              ncc(color.mikuCyan) +
+                              selectedSetting.value +
+                              ncc(color.gray9)
+                        );
+                     }
+                     clearListeners();
+                     return resolve();
+                  } else if (key == terminal.Keys.ESC) {
+                     clearListeners();
+                     return resolve();
+                  }
+                  break;
+
+               case 'axis':
+               case 'bindings':
+                  if ((key == terminal.Keys.ARROW_DOWN || key == 's') && !textInputMode) {
+                     if (choiceIndex < choiceIndexMax) choiceIndex++;
+                     else choiceIndex = 0;
+                  } else if ((key == terminal.Keys.ARROW_UP || key == 'w') && !textInputMode) {
+                     if (choiceIndex > 0) choiceIndex--;
+                     else choiceIndex = choiceIndexMax;
+                  } else if (key == terminal.Keys.ENTER) {
+                     switch (currentSetStep) {
+                        case 1: // 1. select, add, remove binding or reset all changes to current setting
+                           if (choiceIndex == choiceIndexMax) {
+                              // reset setting
+                              selectedSetting.value = settingValueBackup.map(v => v.clone());
+                              statusMsg[1] = ncc('Yellow') + 'All changes discarded' + ncc(color.gray9);
+                              break;
+                           }
+
+                           selBindingIndex = choiceIndex;
+                           bindingInputTypePatchName = 'bindingsDeclaration';
+
+                           if (selBindingIndex < selectedSetting.value.length) {
+                              newBinding = selectedSetting.value[selBindingIndex].clone();
+                           } else {
+                              newBinding =
+                                 selectedSetting.type == 'axis'
+                                    ? new handler.AxisBind()
+                                    : new handler.KeyBind();
+                           }
+
+                           // skip to step 3 for binding type
+                           KBEdit_gotoStep(selectedSetting.type == 'axis' ? 2 : 3);
+                           break;
+                        case 2: // select input type "binding", "axis" or "set scaling" (for axis binding type only)
+                           if (choiceIndex == 2) {
+                              // choose set scaling
+                              KBEdit_gotoStep(5);
+                              break;
+                           }
+
+                           KBEdit_gotoStep(3);
+                           lastSelIndex = choiceIndex;
+                           break;
+                        case 3: // select device type (keyboard, mouse, controller, modifier)
+                           let i = 0;
+                           for (const device in patch[bindingInputTypePatchName]) {
+                              // v skip modifier key for axis type
+                              if (selectedSetting.type == 'axis' && device == 'modifiers') continue;
+                              if (i++ != choiceIndex) continue;
+
+                              bindingDeviceTypePatchName = device;
+                           }
+                           lastSelIndex = choiceIndex;
+                           KBEdit_gotoStep(4);
+                           break;
+                        case 4: {
+                           // select binding key/axis
+                           let binding = null;
+                           let i = 0;
+                           for (const key in patch[bindingInputTypePatchName][bindingDeviceTypePatchName]) {
+                              if (i++ != choiceIndex) continue;
+                              binding = key;
+                           }
+
+                           if (bindingDeviceTypePatchName == 'modifiers') {
+                              newBinding.setModifier(binding); // w/o second arg is toggle
+                           } else {
+                              newBinding.append(binding, bindingDeviceTypePatchName);
+                           }
+
+                           KBEdit_gotoStep(selectedSetting.type == 'axis' ? 2 : 3);
+                           break;
+                        }
+                        case 5: {
+                           // set axis scaling
+                           const num = parseFloat(textField) / 100;
+                           if (isNaN(num)) {
+                              statusMsg[1] = ncc('Red') + 'Invalid number value' + ncc(color.gray9);
+                              break;
+                           }
+
+                           newBinding.scale = num;
+                           KBEdit_gotoStep(2);
+                           break;
+                        }
+                     }
+                  } else if (key == terminal.Keys.CTRL_ENTER) {
+                     if (newBinding.value == null) {
+                        statusMsg[1] = ncc('Red') + 'No binding selected' + ncc(color.gray9);
+                        break;
+                     }
+
+                     if (selBindingIndex < selectedSetting.value.length) {
+                        selectedSetting.value[selBindingIndex] = newBinding;
+                        statusMsg[1] = 'Binding modified';
+                     } else {
+                        selectedSetting.value.push(newBinding);
+                        statusMsg[1] = 'Binding added';
+                     }
+
+                     newBinding = null;
+                     KBEdit_gotoStep(1);
+                  } else if (terminal.Keys.isBackspace(key)) {
+                     // delete a key in current binding
+                     if (textInputMode) break; // text input will be handled above
+
+                     if (newBinding.value != null) {
+                        newBinding.pop();
+                     } else if (newBinding.scale != 1) {
+                        newBinding.scale = 1; // we can't just delete the scale value
+                     } else {
+                        for (const key in newBinding.modifier) {
+                           if (newBinding.modifier[key]) {
+                              newBinding.modifier[key] = false;
+                              break;
+                           }
+                        }
+                     }
+
+                     textField = newBinding.toString();
+                  } else if (key == terminal.Keys.CTRL_BACKSPACE) {
+                     // delete current binding
+                     if (currentSetStep != 1) break;
+                     if (choiceIndex >= choiceIndexMax - 1) break; // not a binding, do nothing
+
+                     selectedSetting.value.splice(choiceIndex, 1);
+                     choiceIndexMax--;
+                     statusMsg[1] = ncc(color.aquaPink) + 'Binding removed' + ncc(color.gray9);
+                  } else if (key == terminal.Keys.CTRL_G) {
+                     // toggle key input mode
+                     if (currentSetStep != 4) break;
+                     if (bindingDeviceTypePatchName !== 'keyboard') break;
+                     KBEdit_gotoStep(6);
+                  } else if (key == terminal.Keys.ESC) {
+                     if (textInputMode && currentSetStep == 5) {
+                        KBEdit_gotoStep(2); // exit step 5
+                        break;
+                     }
+
+                     if (currentSetStep == 1) {
+                        clearListeners();
+
+                        if (_.isEqual(selectedSetting.value, settingValueBackup)) {
+                           return resolve('');
+                        }
+
+                        const clone = _.cloneDeep(selectedSetting);
+                        clone.value = settingValueBackup;
+
+                        changesBackup.set(selectedSettingName, clone);
+                        return resolve('Setting updated');
+                     }
+
+                     KBEdit_gotoStep(
+                        // skip step 2 for 'bindings' type
+                        currentSetStep - (selectedSetting.type == 'bindings' && currentSetStep == 3 ? 2 : 1)
+                     );
+                     break;
+                  }
+            }
+
+            updateFooterStatusMsg0();
+
+            lastSelIndex = drawSettingEditor(settingsMap, settingIndex, statusMsg, choiceIndex, {
+               step: currentSetStep,
+               lastSelIndex,
+               selBindingIndex,
+               bindingInputTypePatchName,
+               bindingDeviceTypePatchName,
+            }).lastSelIndex;
+         })
+      );
+
+      terminal.on(
+         'resize',
+         (resizeListener = () => {
+            drawSettingEditor(settingsMap, settingIndex, statusMsg, choiceIndex, {
+               step: currentSetStep,
+               lastSelIndex,
+               selBindingIndex,
+               bindingInputTypePatchName,
+               bindingDeviceTypePatchName,
+            });
+         })
+      );
+
+      function clearListeners() {
          terminal.removeListener('key', onKeyListener);
          terminal.removeListener('resize', resizeListener);
       }
    });
 
-
-   function KBEdit_gotoStep(step){
+   function KBEdit_gotoStep(step) {
       currentSetStep = step;
 
       /**
@@ -1659,7 +2005,7 @@ async function showSettingEditMenu(settingsMap, settingIndex){
        * - update textField and textFieldPrefix if needed
        * - set textInputMode for steps that require text input
        */
-      switch(step){
+      switch (step) {
          case 1: // switching to 1: select, add, remove binding or apply all binding to current setting
             // addition 2 item for add new binding and apply all bindings
             choiceIndexMax = selectedSetting.value.length + 1;
@@ -1668,30 +2014,28 @@ async function showSettingEditMenu(settingsMap, settingIndex){
             break;
          case 2: // switching to 2: select "binding", "axis" or "Set Scaling" (for axis type only)
             choiceIndexMax = 2; // 0 for binding, 1 for axis
-            if(selBindingIndex < selectedSetting.value.length)
+            if (selBindingIndex < selectedSetting.value.length)
                textFieldPrefix = `Binding ${selBindingIndex + 1}: `;
-            else
-               textFieldPrefix = 'New binding: ';
+            else textFieldPrefix = 'New binding: ';
 
             textField = newBinding.toString();
 
             textInputMode = false;
             break;
          case 3: // switching to 3: select device type (keyboard, mouse, controller, modifier)
-            if(selBindingIndex < selectedSetting.value.length)
+            if (selBindingIndex < selectedSetting.value.length)
                textFieldPrefix = `Binding ${selBindingIndex + 1}: `;
-            else
-               textFieldPrefix = 'New binding: ';
+            else textFieldPrefix = 'New binding: ';
 
             textField = newBinding.toString();
 
-            if(selectedSetting.type == 'bindings'){
+            if (selectedSetting.type == 'bindings') {
                choiceIndexMax = to.propertiesCount(patch.bindingsDeclaration) - 1;
-
-            }else if(choiceIndex){ // 0 for binding, 1 for axis
+            } else if (choiceIndex) {
+               // 0 for binding, 1 for axis
                bindingInputTypePatchName = 'axisDeclaration';
                choiceIndexMax = to.propertiesCount(patch[bindingInputTypePatchName]) - 1;
-            }else{
+            } else {
                bindingInputTypePatchName = 'bindingsDeclaration';
                // v minus 2 because we don't want to include 'modifiers' option
                choiceIndexMax = to.propertiesCount(patch[bindingInputTypePatchName]) - 2;
@@ -1700,16 +2044,16 @@ async function showSettingEditMenu(settingsMap, settingIndex){
             textInputMode = false;
             break;
          case 4: // switching to 4: select binding key/axis
-            if(selBindingIndex < selectedSetting.value.length)
+            if (selBindingIndex < selectedSetting.value.length)
                textFieldPrefix = `Binding ${selBindingIndex + 1}: `;
-            else
-               textFieldPrefix = 'New binding: ';
-            choiceIndexMax = to.propertiesCount(patch[bindingInputTypePatchName][bindingDeviceTypePatchName]) - 1;
+            else textFieldPrefix = 'New binding: ';
+            choiceIndexMax =
+               to.propertiesCount(patch[bindingInputTypePatchName][bindingDeviceTypePatchName]) - 1;
             textField = newBinding.toString();
             textInputMode = false;
             break;
          case 5: // switching to 5: set axis scaling
-            textField = (newBinding.scale * 100) + '';
+            textField = newBinding.scale * 100 + '';
             textFieldPrefix = 'Scale (-100..100): ';
             textInputMode = true;
             break;
@@ -1717,51 +2061,56 @@ async function showSettingEditMenu(settingsMap, settingIndex){
             textField = '';
             textFieldPrefix = 'Waiting for key press...';
             textInputMode = false;
-            break
+            break;
       }
 
       choiceIndex = 0;
    }
 
-
-   function updateFooterStatusMsg0(){
+   function updateFooterStatusMsg0() {
       let input = textField;
-      if(input&&textInputMode){
-         if(cursorPos == 0){
+      if (input && textInputMode) {
+         if (cursorPos == 0) {
             input += ncc(color.gray6, 'bg') + ' ' + ncc(color.gray3, 'bg');
-
-         }else{
-            input = input.slice(0, cursorPos) + ncc(color.gray6, 'bg') + input.at(cursorPos) + ncc(color.gray3, 'bg') + (cursorPos + 1?input.slice(cursorPos + 1):'');
+         } else {
+            input =
+               input.slice(0, cursorPos) +
+               ncc(color.gray6, 'bg') +
+               input.at(cursorPos) +
+               ncc(color.gray3, 'bg') +
+               (cursorPos + 1 ? input.slice(cursorPos + 1) : '');
          }
       }
 
-      const blank = textInputMode?ncc(color.gray6, 'bg')+' '+ncc(color.gray3, 'bg'):'';
-      statusMsg[0] = textFieldPrefix+(textField?ncc(color.mikuCyan)+input:blank)+ncc(color.gray9);
+      const blank = textInputMode ? ncc(color.gray6, 'bg') + ' ' + ncc(color.gray3, 'bg') : '';
+      statusMsg[0] = textFieldPrefix + (textField ? ncc(color.mikuCyan) + input : blank) + ncc(color.gray9);
    }
 }
 
-
 /**
  */
-async function showMainMenu(settingTFIDF, settingSearchFields){
+async function showMainMenu(settingTFIDF, settingSearchFields) {
    const settingGroups = [
-      ...Object.keys(patch.options), '[Uncategorized]',
-      '📥\nSave Settings', `♻️\n${ncc('Red')}Revert Changes`,
-      '📚\nRestore Backup', /*'⚙️\nEditor Settings',*/ // TODO: add editor settings later
-      '🌱\nExit'
+      ...Object.keys(patch.options),
+      '[Uncategorized]',
+      '📥\nSave Settings',
+      `♻️\n${ncc('Red')}Revert Changes`,
+      '📚\nRestore Backup' /*'⚙️\nEditor Settings',*/, // TODO: add editor settings later
+      '🌱\nExit',
    ];
 
-   const itemWidth = settingGroups.reduce((prev, curr) => {
-      if(curr.includes('\n')){
-         for(const line of curr.split('\n')){
-            if(to.ex_length(line, 2) > prev) prev = to.ex_length(line, 2);
+   const itemWidth =
+      settingGroups.reduce((prev, curr) => {
+         if (curr.includes('\n')) {
+            for (const line of curr.split('\n')) {
+               if (to.ex_length(line, 2) > prev) prev = to.ex_length(line, 2);
+            }
+            return prev;
          }
-         return prev;
-      }
 
-      const currLen = to.ex_length(curr, 2);
-      return prev > currLen? prev: currLen;
-   }, 0) + 4;
+         const currLen = to.ex_length(curr, 2);
+         return prev > currLen ? prev : currLen;
+      }, 0) + 4;
    const itemHeight = 5;
    let colCount = 0;
    let rowCount = 0;
@@ -1774,205 +2123,239 @@ async function showMainMenu(settingTFIDF, settingSearchFields){
    // terminal.log(itemWidth, itemHeight, colCount, rowCount)
 
    drawMainMenu(settingGroups, selectedIndex, statusMsg, {
-      itemWidth, itemHeight, colCount, rowCount
+      itemWidth,
+      itemHeight,
+      colCount,
+      rowCount,
    });
 
    return new Promise((resolve, reject) => {
-      let onKeyListener = null, resizeListener = null;
-      terminal.on('key', onKeyListener = async (key, preventDefault) => {
-         if(inOtherMenu) return;
-         preventDefault?.();
+      let onKeyListener = null,
+         resizeListener = null;
+      terminal.on(
+         'key',
+         (onKeyListener = async (key, preventDefault) => {
+            if (inOtherMenu) return;
+            preventDefault?.();
 
-         KeySwitch: switch(key){
-            case terminal.Keys.ARROW_LEFT:
-            case 'a':
-               if(selectedIndex > 0) selectedIndex--;
-               break;
-            case terminal.Keys.ARROW_UP:
-            case 'w':
-               if(selectedIndex >= colCount) selectedIndex -= colCount;
-               break;
-            case terminal.Keys.ARROW_RIGHT:
-            case 'd':
-               if(selectedIndex < settingGroups.length - 1)
-                  selectedIndex++;
-               break;
-            case terminal.Keys.ARROW_DOWN:
-            case 's':
-               if(
-                  settingGroups.length - selectedIndex - 1 >= colCount ||
-                  settingGroups.length % colCount > 0
-               ) selectedIndex = Math.min(selectedIndex + colCount, settingGroups.length - 1);
-               break;
-            case terminal.Keys.ENTER:
-               statusMsg = ['', ''];
-               switch(selectedIndex - to.propertiesCount(patch.options)){
-                  // negative and 0 index for each settings category and [Uncategorized]
-                  case 1: // save settings
-                  {
-                     const code = await writeSettings();
-                     if(!code){
-                        statusMsg[0] = 'Settings saved. changes will take effect after restarting the game';
-                     }
-                     else if(code == 1){
-                        statusMsg[0] = ncc('Red') + `The Game is running, please close it and try again.` + ncc(color.gray9);
-                     }
-                     else if(code == 2){
-                        statusMsg[0] = ncc('Red') + `Error while writing, see log for more info.` + ncc(color.gray9);
-                     }
-                     break KeySwitch;
-                  }
-
-                  case 2: // revert changes
-                     if(!changesBackup.size){
-                        statusMsg[0] = 'No changes to revert';
+            KeySwitch: switch (key) {
+               case terminal.Keys.ARROW_LEFT:
+               case 'a':
+                  if (selectedIndex > 0) selectedIndex--;
+                  break;
+               case terminal.Keys.ARROW_UP:
+               case 'w':
+                  if (selectedIndex >= colCount) selectedIndex -= colCount;
+                  break;
+               case terminal.Keys.ARROW_RIGHT:
+               case 'd':
+                  if (selectedIndex < settingGroups.length - 1) selectedIndex++;
+                  break;
+               case terminal.Keys.ARROW_DOWN:
+               case 's':
+                  if (
+                     settingGroups.length - selectedIndex - 1 >= colCount ||
+                     settingGroups.length % colCount > 0
+                  )
+                     selectedIndex = Math.min(selectedIndex + colCount, settingGroups.length - 1);
+                  break;
+               case terminal.Keys.ENTER:
+                  statusMsg = ['', ''];
+                  switch (selectedIndex - to.propertiesCount(patch.options)) {
+                     // negative and 0 index for each settings category and [Uncategorized]
+                     case 1: { // save settings
+                        const code = await writeSettings();
+                        if (!code) {
+                           statusMsg[0] =
+                              'Settings saved. changes will take effect after restarting the game';
+                        } else if (code == 1) {
+                           statusMsg[0] =
+                              ncc('Red') +
+                              `The Game is running, please close it and try again.` +
+                              ncc(color.gray9);
+                        } else if (code == 2) {
+                           statusMsg[0] =
+                              ncc('Red') + `Error while writing, see log for more info.` + ncc(color.gray9);
+                        }
                         break KeySwitch;
                      }
 
-                     for(const [key, value] of changesBackup){
-                        settings.parsed.set(key, value);
-                     }
-                     changesBackup.clear();
-                     statusMsg[0] = 'Changes reverted';
-                     break KeySwitch;
-                  case 3: // restore backup
-                     inOtherMenu = true;
-                     statusMsg[0] = await showRestoreBackupMenu() ?? '';
-                     inOtherMenu = false;
-                     break KeySwitch;
-                  case 4: // exit
-                     const exitMsg = await exitProgram();
-                     if(exitMsg) statusMsg[0] = exitMsg;
-                     break KeySwitch;
-               }
+                     case 2: // revert changes
+                        if (!changesBackup.size) {
+                           statusMsg[0] = 'No changes to revert';
+                           break KeySwitch;
+                        }
 
-               inOtherMenu = true;
-               await showSettings(
-                  settingGroups[selectedIndex],
-                  settings.parsed, settingTFIDF, settingSearchFields
-               );
-               inOtherMenu = false;
-               statusMsg[1] = changesBackup.size
-                  ? ncc('Bright') + ncc('Yellow') + changesBackup.size + ' unsaved changes' + ncc() + ncc(color.gray9) + ncc(color.gray3, 'bg')
-                  : '';
-         }
+                        for (const [key, value] of changesBackup) {
+                           settings.parsed.set(key, value);
+                        }
+                        changesBackup.clear();
+                        statusMsg[0] = 'Changes reverted';
+                        break KeySwitch;
+                     case 3: // restore backup
+                        inOtherMenu = true;
+                        statusMsg[0] = (await showRestoreBackupMenu()) ?? '';
+                        inOtherMenu = false;
+                        break KeySwitch;
+                     case 4: // exit
+                        const exitMsg = await exitProgram();
+                        if (exitMsg) statusMsg[0] = exitMsg;
+                        break KeySwitch;
+                  }
 
-         drawMainMenu(settingGroups, selectedIndex, statusMsg, {
-            itemWidth, itemHeight, colCount, rowCount
-         });
-      });
+                  inOtherMenu = true;
+                  await showSettings(
+                     settingGroups[selectedIndex],
+                     settings.parsed,
+                     settingTFIDF,
+                     settingSearchFields
+                  );
+                  inOtherMenu = false;
+                  statusMsg[1] = changesBackup.size
+                     ? ncc('Bright') +
+                       ncc('Yellow') +
+                       changesBackup.size +
+                       ' unsaved changes' +
+                       ncc() +
+                       ncc(color.gray9) +
+                       ncc(color.gray3, 'bg')
+                     : '';
+            }
 
-      terminal.on('resize', resizeListener = () => {
-         if(inOtherMenu) return;
+            drawMainMenu(settingGroups, selectedIndex, statusMsg, {
+               itemWidth,
+               itemHeight,
+               colCount,
+               rowCount,
+            });
+         })
+      );
 
-         calMenuGridSize();
-         drawMainMenu(settingGroups, selectedIndex, statusMsg, {
-            itemWidth, itemHeight, colCount, rowCount
-         });
-      });
+      terminal.on(
+         'resize',
+         (resizeListener = () => {
+            if (inOtherMenu) return;
+
+            calMenuGridSize();
+            drawMainMenu(settingGroups, selectedIndex, statusMsg, {
+               itemWidth,
+               itemHeight,
+               colCount,
+               rowCount,
+            });
+         })
+      );
    });
 
-   function calMenuGridSize(){
+   function calMenuGridSize() {
       colCount = Math.min(Math.floor(terminal.width / itemWidth), 3);
-      rowCount = Math.ceil(Math.min(
-         (settingGroups.length / colCount),
-         ((terminal.height * .4) / itemHeight)
-      ));
+      rowCount = Math.ceil(Math.min(settingGroups.length / colCount, (terminal.height * 0.4) / itemHeight));
    }
 }
 
-
-
-
-async function showRestoreBackupMenu(){
+async function showRestoreBackupMenu() {
    const backupFileNames = getBackupList();
 
-   const footerMsg = `${ncc(color.mikuCyan)}← → ↑ ↓${ncc(color.gray9)} to Move, ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to ${ncc('Red')}restore${ncc(color.gray9)} selected,  `+ncc(color.mikuCyan)+'Esc'+ncc(color.gray9)+' to go back';
-   let selectedIndex = 0, statusMsg = ['', ''];
+   const footerMsg =
+      `${ncc(color.mikuCyan)}← → ↑ ↓${ncc(color.gray9)} to Move, ${ncc(color.mikuCyan)}Enter${ncc(color.gray9)} to ${ncc('Red')}restore${ncc(color.gray9)} selected,  ` +
+      ncc(color.mikuCyan) +
+      'Esc' +
+      ncc(color.gray9) +
+      ' to go back';
+   let selectedIndex = 0,
+      statusMsg = ['', ''];
    let restoring = false;
    let awitConfirm = false;
-
 
    drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
 
    return new Promise((resolve, reject) => {
-      let onKeyListener = null, resizeListener = null;
-      terminal.on('key', onKeyListener = async (key, preventDefault) => {
-         if(key == terminal.Keys.CTRL_C) return;
+      let onKeyListener = null,
+         resizeListener = null;
+      terminal.on(
+         'key',
+         (onKeyListener = async (key, preventDefault) => {
+            if (key == terminal.Keys.CTRL_C) return;
 
-         preventDefault?.();
+            preventDefault?.();
 
-         if(restoring) return;
+            if (restoring) return;
 
-         if(key == 's'||key == terminal.Keys.ARROW_DOWN){
-            if(selectedIndex < backupFileNames.length - 1) selectedIndex++;
-            else selectedIndex = 0;
-            drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
-
-         }else if(key == 'w'||key == terminal.Keys.ARROW_UP){
-            if(selectedIndex > 0) selectedIndex--;
-            else selectedIndex = backupFileNames.length - 1;
-            drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
-
-         }else if(key == terminal.Keys.ESC){
-            if(awitConfirm){
-               awitConfirm = false;
-               statusMsg[0] = '';
+            if (key == 's' || key == terminal.Keys.ARROW_DOWN) {
+               if (selectedIndex < backupFileNames.length - 1) selectedIndex++;
+               else selectedIndex = 0;
                drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
-               return;
-            }
-
-            terminal.removeListener('key', onKeyListener);
-            terminal.removeListener('resize', resizeListener);
-            return resolve();
-
-         }else if(key == terminal.Keys.ENTER){
-            doRestore: {
-               if(await isProcessRunning(config.gameClientName)){
-                  statusMsg[0] = ncc('Red') + 'The Game is running, please close it and try again.' + ncc(color.gray9);
-                  break doRestore;
+            } else if (key == 'w' || key == terminal.Keys.ARROW_UP) {
+               if (selectedIndex > 0) selectedIndex--;
+               else selectedIndex = backupFileNames.length - 1;
+               drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
+            } else if (key == terminal.Keys.ESC) {
+               if (awitConfirm) {
+                  awitConfirm = false;
+                  statusMsg[0] = '';
+                  drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
+                  return;
                }
 
-               if(!awitConfirm){
-                  awitConfirm = true;
-                  statusMsg[0] = ncc('Red') + 'this action cannot be undone'+ncc(color.gray9)+', press '+ncc(color.mikuCyan)+'Enter'+ncc(color.gray9)+' again to confirm';
-                  break doRestore;
-               }
-
-               restoring = true;
-               statusMsg[0] = 'Restoring...';
-               restoreBackup(backupFileNames[selectedIndex]).then(async success => {
-                  restoring = false;
-
-                  if(!success){
-                     statusMsg[1] = ncc('Red') + 'restore failed' + ncc(color.gray9);
-                     drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
-                     return;
+               terminal.removeListener('key', onKeyListener);
+               terminal.removeListener('resize', resizeListener);
+               return resolve();
+            } else if (key == terminal.Keys.ENTER) {
+               doRestore: {
+                  if (await isProcessRunning(config.gameClientName)) {
+                     statusMsg[0] =
+                        ncc('Red') + 'The Game is running, please close it and try again.' + ncc(color.gray9);
+                     break doRestore;
                   }
 
-                  statusMsg[0] = 'Reloading settings...';
-                  drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
-                  await loadSettings(true);
+                  if (!awitConfirm) {
+                     awitConfirm = true;
+                     statusMsg[0] =
+                        ncc('Red') +
+                        'this action cannot be undone' +
+                        ncc(color.gray9) +
+                        ', press ' +
+                        ncc(color.mikuCyan) +
+                        'Enter' +
+                        ncc(color.gray9) +
+                        ' again to confirm';
+                     break doRestore;
+                  }
 
-                  terminal.removeListener('key', onKeyListener);
-                  terminal.removeListener('resize', resizeListener);
-                  return resolve('Restore successful');
-               });
+                  restoring = true;
+                  statusMsg[0] = 'Restoring...';
+                  restoreBackup(backupFileNames[selectedIndex]).then(async success => {
+                     restoring = false;
+
+                     if (!success) {
+                        statusMsg[1] = ncc('Red') + 'restore failed' + ncc(color.gray9);
+                        drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
+                        return;
+                     }
+
+                     statusMsg[0] = 'Reloading settings...';
+                     drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
+                     await loadSettings(true);
+
+                     terminal.removeListener('key', onKeyListener);
+                     terminal.removeListener('resize', resizeListener);
+                     return resolve('Restore successful');
+                  });
+               }
+
+               drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
             }
+         })
+      );
 
+      terminal.on(
+         'resize',
+         (resizeListener = () => {
             drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
-         }
-      });
-
-      terminal.on('resize', resizeListener = () => {
-         drawRestoreBackupMenu(backupFileNames, selectedIndex, footerMsg, statusMsg);
-      });
+         })
+      );
    });
 }
-
-
-
-
 
 function loadPatch() {
    writeLog(`Loading patch.json...`, 3, true);
@@ -1985,22 +2368,21 @@ function loadPatch() {
       return;
    }
 
-   for(const src in patch.configSrcMap){
+   for (const src in patch.configSrcMap) {
       loadSourceMap(src);
    }
 
-   if(patch.postprocessor){
-      if(patch.postprocessor.onChanged){
-         for(const key in patch.postprocessor.onChanged){
-            if(typeof patch.postprocessor.onChanged[key] != 'string')
-               continue;
+   if (patch.postprocessor) {
+      if (patch.postprocessor.onChanged) {
+         for (const key in patch.postprocessor.onChanged) {
+            if (typeof patch.postprocessor.onChanged[key] != 'string') continue;
 
-            if(patch.postprocessor.onChanged[key].startsWith('$func:')){
-               patch.postprocessor.onChanged[key] = new AsyncFunction('oldValue, newValue, settings, patch, srcWithChanges, sqlite',
+            if (patch.postprocessor.onChanged[key].startsWith('$func:')) {
+               patch.postprocessor.onChanged[key] = new AsyncFunction(
+                  'oldValue, newValue, settings, patch, srcWithChanges, sqlite',
                   patch.postprocessor.onChanged[key].slice(6)
                );
-            }
-            else {
+            } else {
                writeLog(`Invalid onChanged function for "${key}"`, 1, true);
                hasErrorOrWarning = true;
             }
@@ -2012,24 +2394,22 @@ function loadPatch() {
 function loadSourceMap(sourceName) {
    const sourceConfig = patch.configSrcMap[sourceName];
    const manifest = sourceConfig.manifest;
-   if(!manifest) return;
+   if (!manifest) return;
 
    sourceConfig.disabled = sourceConfig.disabled ?? false;
    sourceConfig.usedAsRaw = sourceConfig.usedAsRaw ?? false;
 
    // LINK: @jdn34 Replacer/Reviver syntax
-   if(manifest.Replacer && typeof manifest.Replacer == 'string'){
-      if(manifest.Replacer === 'none'){
+   if (manifest.Replacer && typeof manifest.Replacer == 'string') {
+      if (manifest.Replacer === 'none') {
          manifest.Replacer = null;
          return;
       }
 
-      if(manifest.Replacer === 'default')
-         manifest.Replacer = to.JSONReplacer;
-      else if(manifest.Replacer.startsWith('$func:')){
+      if (manifest.Replacer === 'default') manifest.Replacer = to.JSONReplacer;
+      else if (manifest.Replacer.startsWith('$func:')) {
          manifest.Replacer = createJSONReviver(manifest.Replacer);
-      }
-      else{
+      } else {
          writeLog(`Invalid Replacer for "${sourceName}"`, 1, true);
          writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
          manifest.Replacer = null;
@@ -2037,19 +2417,16 @@ function loadSourceMap(sourceName) {
          return;
       }
    }
-   if(manifest.Reviver && typeof manifest.Reviver == 'string'){
-      if(manifest.Reviver === 'none'){
+   if (manifest.Reviver && typeof manifest.Reviver == 'string') {
+      if (manifest.Reviver === 'none') {
          manifest.Reviver = null;
          return;
       }
 
-      if(manifest.Reviver === 'default')
-         manifest.Reviver = to.JSONReviver;
-
-      else if(manifest.Reviver.startsWith('$func:')){
+      if (manifest.Reviver === 'default') manifest.Reviver = to.JSONReviver;
+      else if (manifest.Reviver.startsWith('$func:')) {
          manifest.Reviver = createJSONReviver(manifest.Reviver);
-      }
-      else{
+      } else {
          writeLog(`Invalid Reviver for "${sourceName}"`, 1, true);
          writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
          manifest.Reviver = null;
@@ -2058,17 +2435,16 @@ function loadSourceMap(sourceName) {
       }
    }
 
-
-   if(manifest.readMapper && typeof manifest.readMapper == 'string'){
-      if(manifest.readMapper === 'none'){
+   if (manifest.readMapper && typeof manifest.readMapper == 'string') {
+      if (manifest.readMapper === 'none') {
          manifest.readMapper = null;
          return;
-      }
-
-      else if(manifest.readMapper.startsWith('$func:')){
+      } else if (manifest.readMapper.startsWith('$func:')) {
          manifest.readMapper = manifest.readMapper.slice(6);
 
-         manifest.readMapper = new Function('key, value', `
+         manifest.readMapper = new Function(
+            'key, value',
+            `
             ${manifest.readMapper}
 
             return {
@@ -2076,8 +2452,7 @@ function loadSourceMap(sourceName) {
                value
             };`
          );
-      }
-      else{
+      } else {
          writeLog(`Invalid readMapper for "${sourceName}"`, 1, true);
          writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
          manifest.readMapper = null;
@@ -2085,16 +2460,16 @@ function loadSourceMap(sourceName) {
          return;
       }
    }
-   if(manifest.writeMapper && typeof manifest.writeMapper == 'string'){
-      if(manifest.writeMapper === 'none'){
+   if (manifest.writeMapper && typeof manifest.writeMapper == 'string') {
+      if (manifest.writeMapper === 'none') {
          manifest.writeMapper = null;
          return;
-      }
-
-      else if(manifest.writeMapper.startsWith('$func:')){
+      } else if (manifest.writeMapper.startsWith('$func:')) {
          manifest.writeMapper = manifest.writeMapper.slice(6);
 
-         manifest.writeMapper = new Function('key, value', `
+         manifest.writeMapper = new Function(
+            'key, value',
+            `
             ${manifest.writeMapper}
 
             return {
@@ -2102,8 +2477,7 @@ function loadSourceMap(sourceName) {
                value
             };`
          );
-      }
-      else{
+      } else {
          writeLog(`Invalid writeMapper for "${sourceName}"`, 1, true);
          writeLog(`Manifest: ${to.yuString(manifest)}`, 1);
          manifest.writeMapper = null;
@@ -2115,7 +2489,6 @@ function loadSourceMap(sourceName) {
    manifest.literalTypeParsing = manifest.literalTypeParsing ?? false;
    manifest.caseSensitive = manifest.caseSensitive ?? true;
 }
-
 
 function verifyGamePath(gamePath) {
    writeLog(`Verifying game paths...`, 3, true);
@@ -2150,9 +2523,9 @@ function verifyGamePath(gamePath) {
          continue;
       }
 
-      try{
+      try {
          fs.accessSync(fullPath, fs.constants.W_OK);
-      }catch(e){
+      } catch (e) {
          writeLog(`can't write to file "${fullPath}", premission denied.`, 1, true);
          continue;
       }
@@ -2160,19 +2533,15 @@ function verifyGamePath(gamePath) {
    }
 
    if (!passCount) {
-      writeLog(
-         `Can't find any files in the game folder. Please check the path and try again.`, 1, true
-      );
+      writeLog(`Can't find any files in the game folder. Please check the path and try again.`, 1, true);
       return false;
-   }
-   else if (passCount < to.propertiesCount(patch.configSrcMap)) {
+   } else if (passCount < to.propertiesCount(patch.configSrcMap)) {
       writeLog(`Some file(s) are missing but we can work with the rest.`, 2, true);
       hasErrorOrWarning = true;
    }
 
    return true;
 }
-
 
 async function loadSettings(skipTFIDFCalculation = false) {
    writeLog(`Loading settings...`, 3, true);
@@ -2181,7 +2550,7 @@ async function loadSettings(skipTFIDFCalculation = false) {
    settings.allRawSettings = new Map();
 
    for (const src in patch.configSrcMap) {
-      if(patch.configSrcMap[src].disabled) continue;
+      if (patch.configSrcMap[src].disabled) continue;
 
       const relPath = patch.configSrcMap[src].path;
       const fullPath = path.resolve(config.gameInstalledPath, relPath);
@@ -2216,10 +2585,10 @@ async function loadSettings(skipTFIDFCalculation = false) {
       settings.allRawSettings.set(src, {
          dataType: patch.configSrcMap[src].dataType,
          value: rawSettings,
-         src
+         src,
       });
 
-      for(const group in rawSettings){
+      for (const group in rawSettings) {
          for (const key in rawSettings[group]) {
             const value = rawSettings[group][key];
             settings.raw.set(new UniqueKey(key), { src, value, group, key });
@@ -2227,53 +2596,48 @@ async function loadSettings(skipTFIDFCalculation = false) {
       }
    }
 
-   try{
+   try {
       parseSettings();
-   }
-   catch(e){
-      if(e instanceof assert.AssertionError){
+   } catch (e) {
+      if (e instanceof assert.AssertionError) {
          writeLog(`Type checking failed: ${e.message}`, 2, true);
          hasErrorOrWarning = true;
-      }
-      else {
+      } else {
          writeLog(`Error while parsing settings: ${e.message}`, 1, true);
          throw e;
       }
    }
 
    const settingSearchFields = [];
-   const settingTFIDF = (skipTFIDFCalculation
+   const settingTFIDF = skipTFIDFCalculation
       ? null
       : to.DataScienceKit.TFIDF_of(
-         [...settings.parsed].map(([key, value]) => {
-            settingSearchFields.push(key + ' ' + (value.description??'') + ' ' + (value.key??''));
-            return to.cleanArr([
-               ...key.split(/\s/g),
-               ...(value.description? value.description.split(/\s/g): ''),
-               (value.key ?? '')
-            ]);
-         }),
-      )
-   );
+           [...settings.parsed].map(([key, value]) => {
+              settingSearchFields.push(key + ' ' + (value.description ?? '') + ' ' + (value.key ?? ''));
+              return to.cleanArr([
+                 ...key.split(/\s/g),
+                 ...(value.description ? value.description.split(/\s/g) : ''),
+                 value.key ?? '',
+              ]);
+           })
+        );
 
    writeLog(`Loaded ${settings.parsed.size} settings from ${settings.allRawSettings.size} sources.`, 3, true);
 
    return {
       settingTFIDF,
-      settingSearchFields
+      settingSearchFields,
    };
 }
-
-
 
 async function parseSettings() {
    const combineActionMap = settings.allRawSettings.get('combinedAction')?.value?.CombineAction;
 
-   for(const catergory in patch.options){
-      for(const optName in patch.options[catergory]){
+   for (const catergory in patch.options) {
+      for (const optName in patch.options[catergory]) {
          const optDecl = patch.options[catergory][optName];
 
-         if(!optDecl.src || !optDecl.key || patch.configSrcMap[optDecl.src].usedAsRaw) continue;
+         if (!optDecl.src || !optDecl.key || patch.configSrcMap[optDecl.src].usedAsRaw) continue;
 
          /**
           * @type {ParsedGameSettingObj}
@@ -2281,7 +2645,7 @@ async function parseSettings() {
          let parsedValue = null;
          const rawSettings = settings.allRawSettings.get(optDecl.src);
 
-         if(!rawSettings) continue;
+         if (!rawSettings) continue;
 
          /**
           * config file content type (e.g. ini-keyValue, KBTupleMap, sqlite)
@@ -2318,11 +2682,15 @@ async function parseSettings() {
                );
                break;
             default:
-               writeLog(`Invalid type "${patch.configSrcMap[optDecl.src].type}" for "${optDecl.src}"`, 2, true);
+               writeLog(
+                  `Invalid type "${patch.configSrcMap[optDecl.src].type}" for "${optDecl.src}"`,
+                  2,
+                  true
+               );
                continue;
          }
 
-         if(!parsedValue){
+         if (!parsedValue) {
             writeLog(`Failed to parse "${optName}" with type "${optionDataType}"`, 2, true);
             writeLog('failed reason: `parsedValue` is null', 2);
             hasErrorOrWarning = true;
@@ -2333,43 +2701,56 @@ async function parseSettings() {
          parsedValue.key = optDecl.key;
          parsedValue.description = optDecl.description;
          parsedValue.catergory = catergory;
-         if(optDecl.type) parsedValue.type = optDecl.type;
-         if(optDecl.values) parsedValue.eValues = optDecl.values;
-         if(optDecl.range) parsedValue.range = optDecl.range;
-         if(optDecl.editNote) parsedValue.editNote = optDecl.editNote;
-         if(optDecl.valueDesc) parsedValue.valueDesc = optDecl.valueDesc;
-         if(optDecl.default !== undefined) parsedValue.default = optDecl.default;
-         if(optDecl.editable != null) parsedValue.editable = optDecl.editable;
+         if (optDecl.type) parsedValue.type = optDecl.type;
+         if (optDecl.values) parsedValue.eValues = optDecl.values;
+         if (optDecl.range) parsedValue.range = optDecl.range;
+         if (optDecl.editNote) parsedValue.editNote = optDecl.editNote;
+         if (optDecl.valueDesc) parsedValue.valueDesc = optDecl.valueDesc;
+         if (optDecl.default !== undefined) parsedValue.default = optDecl.default;
+         if (optDecl.editable != null) parsedValue.editable = optDecl.editable;
 
          switch (parsedValue.type) {
             case 'bool':
-               assert(typeof parsedValue.value === 'boolean' || ![0, 1].includes(parsedValue.value), `value \`${parsedValue.key}:${parsedValue.value}\` of type "bool" must be a boolean, instead got ${typeof parsedValue.value}`);
+               assert(
+                  typeof parsedValue.value === 'boolean' || ![0, 1].includes(parsedValue.value),
+                  `value \`${parsedValue.key}:${parsedValue.value}\` of type "bool" must be a boolean, instead got ${typeof parsedValue.value}`
+               );
                break;
-            case 'string': assert(typeof parsedValue.value === 'string', `value \`${parsedValue.key}:${parsedValue.value}\` of type "string" must be a string, instead got ${typeof parsedValue.value}`);
+            case 'string':
+               assert(
+                  typeof parsedValue.value === 'string',
+                  `value \`${parsedValue.key}:${parsedValue.value}\` of type "string" must be a string, instead got ${typeof parsedValue.value}`
+               );
                break;
             case 'number':
-            case 'enum': assert(typeof parsedValue.value === 'number', `value \`${parsedValue.key}:${parsedValue.value}\` of type "number" or "enum" must be a number, instead got ${typeof parsedValue.value}`);
+            case 'enum':
+               assert(
+                  typeof parsedValue.value === 'number',
+                  `value \`${parsedValue.key}:${parsedValue.value}\` of type "number" or "enum" must be a number, instead got ${typeof parsedValue.value}`
+               );
                break;
             case 'axis':
             case 'bindings':
                break;
             default:
-               throw new Error(`[Error] while writing: Type "${parsedValue.type}" is not supported. Found in key "${parsedValue.key}"`);
+               throw new Error(
+                  `[Error] while writing: Type "${parsedValue.type}" is not supported. Found in key "${parsedValue.key}"`
+               );
          }
 
          settings.parsed.set(new UniqueKey(optName), parsedValue);
       }
    }
 
-   for(const [key, rSetting] of settings.raw){
+   for (const [key, rSetting] of settings.raw) {
       let alreadyParsed = false;
-      for(const [/*optName*/, parsed] of settings.parsed){
-         if(parsed.key === rSetting.key&&parsed.src === rSetting.src&&parsed.group === rSetting.group){
+      for (const [, /*optName*/ parsed] of settings.parsed) {
+         if (parsed.key === rSetting.key && parsed.src === rSetting.src && parsed.group === rSetting.group) {
             alreadyParsed = true;
             break;
          }
       }
-      if(alreadyParsed||patch.configSrcMap[rSetting.src].usedAsRaw) continue;
+      if (alreadyParsed || patch.configSrcMap[rSetting.src].usedAsRaw) continue;
 
       /**
        * @type {ParsedGameSettingObj}
@@ -2380,19 +2761,10 @@ async function parseSettings() {
       switch (srcConfig.dataType) {
          case 'JSON': // same as 'ini'
          case 'ini':
-            parsedValue = handler.parseIniKeyVal(
-               srcConfig.value,
-               rSetting.key,
-               srcConfig.src
-            );
+            parsedValue = handler.parseIniKeyVal(srcConfig.value, rSetting.key, srcConfig.src);
             break;
          case 'KBTupleMap':
-            parsedValue = handler.parseKBTupleMap(
-               srcConfig.value,
-               rSetting.key,
-               patch,
-               combineActionMap
-            );
+            parsedValue = handler.parseKBTupleMap(srcConfig.value, rSetting.key, patch, combineActionMap);
             break;
          case 'literal':
             parsedValue = handler.parseLiteral(
@@ -2408,11 +2780,11 @@ async function parseSettings() {
             continue;
       }
 
-      if(!parsedValue){
+      if (!parsedValue) {
          writeLog(`Failed to parse "${rSetting.key}" with type "${srcConfig.dataType}"`, 2, true);
          writeLog('failed reason: `parsedValue` is null', 2);
          hasErrorOrWarning = true;
-         continue
+         continue;
       }
 
       parsedValue.src = rSetting.src;
@@ -2424,7 +2796,6 @@ async function parseSettings() {
    }
 }
 
-
 /**
  * write settings to the game config files
  * @return  success status
@@ -2433,45 +2804,45 @@ async function parseSettings() {
  * - `1` game is running
  * - `2` error while writing
  */
-async function writeSettings(){
-   if(!settings.parsed||changesBackup.size == 0) return -1; // no changes to write
-   if(await isProcessRunning(config.gameClientName)) return 1; // game is running
+async function writeSettings() {
+   if (!settings.parsed || changesBackup.size == 0) return -1; // no changes to write
+   if (await isProcessRunning(config.gameClientName)) return 1; // game is running
 
    writeLog(`Writing settings to Game src config...`, 3);
    writeLog(`Original of changed value: ${to.yuString(changesBackup)}`, 4);
 
    const srcWithChanges = new Set();
-   for(const [name, parsed] of changesBackup){
+   for (const [name, parsed] of changesBackup) {
       srcWithChanges.add(parsed.src);
 
-      if(patch.configSrcMap[parsed.src]?.manifest?.includeSrc){
-         for(const src of patch.configSrcMap[parsed.src].manifest.includeSrc){
+      if (patch.configSrcMap[parsed.src]?.manifest?.includeSrc) {
+         for (const src of patch.configSrcMap[parsed.src].manifest.includeSrc) {
             srcWithChanges.add(src);
          }
       }
 
-      if(patch.postprocessor.onChanged?.[name]){
+      if (patch.postprocessor.onChanged?.[name]) {
          const func = patch.postprocessor.onChanged[name];
          const newValue = settings.parsed.get(name)?.value;
 
          writeLog(`Running postprocessor for watch key "${name}" (onChanged): ${func.toString()}`, 3);
 
-         if(typeof func === 'function'){
+         if (typeof func === 'function') {
             const result = await func(parsed.value, newValue, settings, patch, srcWithChanges, sqlite);
-            if(result !== undefined) parsed.value = result
+            if (result !== undefined) parsed.value = result;
          }
       }
    }
-
 
    /**
     * @type {Map<string, ParsedGameSettings>}
     */
    const settingsBySrc = new Map();
-   for(const [key, parsed] of settings.parsed){ // list settings that need to be written
-      if(!srcWithChanges.has(parsed.src)) continue;
+   for (const [key, parsed] of settings.parsed) {
+      // list settings that need to be written
+      if (!srcWithChanges.has(parsed.src)) continue;
 
-      if(!settingsBySrc.has(parsed.src)) settingsBySrc.set(parsed.src, new Map);
+      if (!settingsBySrc.has(parsed.src)) settingsBySrc.set(parsed.src, new Map());
       settingsBySrc.get(parsed.src).set(key, parsed);
    }
 
@@ -2482,18 +2853,18 @@ async function writeSettings(){
    //    settingsBySrc.set(src, null);
    // }
 
-   for(const [src, _settings] of settingsBySrc){
+   for (const [src, _settings] of settingsBySrc) {
       const relPath = patch.configSrcMap[src].path;
       const fullPath = path.resolve(config.gameInstalledPath, relPath);
 
       const srcConfig = settings.allRawSettings.get(src);
-      if(!srcConfig) continue;
+      if (!srcConfig) continue;
 
       try {
-         switch(srcConfig.dataType){
+         switch (srcConfig.dataType) {
             case 'JSON':
             case 'ini':
-               if(patch.configSrcMap[src].usedAsRaw)
+               if (patch.configSrcMap[src].usedAsRaw)
                   await handler.writeIniKeyVal_raw(fullPath, patch.configSrcMap[src], srcConfig.value);
                else await handler.writeIniKeyVal(fullPath, patch.configSrcMap[src], _settings);
                break;
@@ -2507,13 +2878,12 @@ async function writeSettings(){
                   _settings,
                   patch.configSrcMap[srcConfig.src].manifest.literalTypeParsing
                );
-               break
+               break;
             default:
                writeLog(`Invalid dataType "${patch.configSrcMap[src].dataType}" for "${src}"`, 2);
                continue;
          }
-      }
-      catch(e){
+      } catch (e) {
          writeLog(`Error writing to "${fullPath}"`, 1);
          writeLog(to.yuString(e), 1);
          return 2;
@@ -2524,26 +2894,25 @@ async function writeSettings(){
    return 0;
 }
 
-
 /**
  * a wrapper for doShutdownTask() to handle unsaved changes
  */
-async function exitProgram(){
-   if(changesBackup.size){
-      const choice = await terminal.promptChoice(['Yes!', 'Discard & exit', 'I\'m not done yet'], {
+async function exitProgram() {
+   if (changesBackup.size) {
+      const choice = await terminal.promptChoice(['Yes!', 'Discard & exit', "I'm not done yet"], {
          display: 'full',
-         msg: `${ncc('Red')}There are unsaved changes, do you want to save before exit?${ncc('Reset')}`
+         msg: `${ncc('Red')}There are unsaved changes, do you want to save before exit?${ncc('Reset')}`,
       });
 
-      if(choice == 2){
+      if (choice == 2) {
          terminal.emit('resize'); // restore previous page by faking a resize event
          return;
       }
 
-      if(choice == 0){
+      if (choice == 0) {
          const code = await writeSettings();
 
-         switch(code){
+         switch (code) {
             case 0:
                return 'Settings saved. changes will take effect after restarting the game';
             case 1:
@@ -2559,33 +2928,30 @@ async function exitProgram(){
    exitProgram();
 }
 
-
 /**
  * backup the game config files
  */
-async function backupGameConfigSrc(){
+async function backupGameConfigSrc() {
    let filesNeedBackup = [];
 
-   for(let src in patch.configSrcMap){
+   for (let src in patch.configSrcMap) {
       const relPath = patch.configSrcMap[src].path;
       filesNeedBackup.push(relPath);
    }
 
    let backupPath = null;
-   try{
+   try {
       backupPath = await createBackup(filesNeedBackup);
-   }
-   catch(e){
+   } catch (e) {
       writeLog(`error while creating backup: ${to.yuString(e)}`, 1, true);
       hasErrorOrWarning = true;
       return;
    }
 
-   if(backupPath){
+   if (backupPath) {
       writeLog(`Created Backup to "${backupPath}"`, 3, true);
    }
 }
-
 
 /**
  * prompt user for game install path
@@ -2601,27 +2967,22 @@ ${ncc(color.mikuCyan)}...${ncc('Reset')}`
    );
 
    let gPath;
-   while(true){
+   while (true) {
       gPath = await terminal.prompt('Enter game folder: ');
-      if(!gPath?.trim()?.length){
-         terminal.log(
-            `${ncc('Red')}[error]${ncc()} Folder path can't be empty.`
-         );
-         continue;
-      };
-
-      if(gPath.startsWith('"')&&gPath.endsWith('"'))
-         gPath = gPath.slice(1, -1);
-
-      gPath = path.normalize(gPath);
-      if(!fs.existsSync(gPath)){
-         terminal.log(
-            `${ncc('Red')}[error]${ncc()} Folder not found or path is invalid, please try again.`
-         );
+      if (!gPath?.trim()?.length) {
+         terminal.log(`${ncc('Red')}[error]${ncc()} Folder path can't be empty.`);
          continue;
       }
 
-      if(!fs.existsSync(path.join(gPath, 'Wuthering Waves Game'))){
+      if (gPath.startsWith('"') && gPath.endsWith('"')) gPath = gPath.slice(1, -1);
+
+      gPath = path.normalize(gPath);
+      if (!fs.existsSync(gPath)) {
+         terminal.log(`${ncc('Red')}[error]${ncc()} Folder not found or path is invalid, please try again.`);
+         continue;
+      }
+
+      if (!fs.existsSync(path.join(gPath, 'Wuthering Waves Game'))) {
          terminal.log(
             `${ncc('Red')}[error]${ncc()} Game folder not found, please check the path and try again.`
          );
@@ -2634,12 +2995,10 @@ ${ncc(color.mikuCyan)}...${ncc('Reset')}`
    config.gameInstalledPath = gPath;
 }
 
-
-
-async function doStartupTask(){
+async function doStartupTask() {
    isElevated = (await import('is-elevated')).default;
 
-   if(_global.isThisProcessElevated === null){
+   if (_global.isThisProcessElevated === null) {
       _global.isThisProcessElevated = await isElevated();
    }
 
@@ -2653,19 +3012,20 @@ async function doStartupTask(){
  * cleanup and exit the program
  * @returns {never|void}
  */
-async function exitProgram(exitCode = 0){
-   if(shuttingDown) return;
+async function exitProgram(exitCode = 0) {
+   if (shuttingDown) return;
    writeLog(`Shutting down...\n\n\n\n`);
 
    shuttingDown = true;
    closeLogFile();
 
-   if(exitCode == 0){
+   if (exitCode == 0) {
       terminal.clearScreen();
       config.writeConfig();
-   }
-   else {
-      terminal.log(`\n\n${ncc('Red')}An error occurred, please check the log for more info.${ncc()}\n\nPress any key to exit...`);
+   } else {
+      terminal.log(
+         `\n\n${ncc('Red')}An error occurred, please check the log for more info.${ncc()}\n\nPress any key to exit...`
+      );
       await terminal.getch();
    }
    terminal.close();

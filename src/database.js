@@ -22,10 +22,9 @@ class SQLiteDBWrapper {
 
    close(cb = null) {
       writeLog('Closing SQLite database', 4);
-      return cb? this.session.close(cb) : this.session.close();
+      return cb ? this.session.close(cb) : this.session.close();
    }
 }
-
 
 const sqlite = {
    /**
@@ -34,17 +33,17 @@ const sqlite = {
     * @returns {Promise<SQLiteDBWrapper>} - A promise that resolves to the opened database
     */
    async open(dbPath) {
-      if(dbPath.startsWith('.'))
-         dbPath = path.resolve(config.gameInstalledPath, dbPath);
+      if (dbPath.startsWith('.')) dbPath = path.resolve(config.gameInstalledPath, dbPath);
 
-      return new SQLiteDBWrapper(await open({
-         filename: dbPath,
-         driver: sqlite3.Database
-      }));
-   }
-}
-
+      return new SQLiteDBWrapper(
+         await open({
+            filename: dbPath,
+            driver: sqlite3.Database,
+         })
+      );
+   },
+};
 
 module.exports = {
-   sqlite
-}
+   sqlite,
+};

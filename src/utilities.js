@@ -28,12 +28,12 @@ async function isProcessRunning(targetProcess) {
       case 'linux':
          cmd = `ps -ax`;
          break;
-      default: break;
+      default:
+         break;
    }
    const { stdout } = await execProms(cmd);
    return stdout.toLowerCase().indexOf(targetProcess.toLowerCase()) > -1;
 }
-
 
 /**
  * Get the path of a process
@@ -43,29 +43,26 @@ async function isProcessRunning(targetProcess) {
 async function getProcessPath(targetProcess) {
    let processPath = null;
    switch (process.platform) {
-      case 'win32':
-         {  // this command will fail the "tricky process" test if not elevated
-            const cmd = `wmic process where "name='${targetProcess}'" get ExecutablePath`;
-            const { stdout } = await execProms(cmd);
+      case 'win32': {
+         // this command will fail the "tricky process" test if not elevated
+         const cmd = `wmic process where "name='${targetProcess}'" get ExecutablePath`;
+         const { stdout } = await execProms(cmd);
 
-            processPath = [
-               ...(stdout.trim().split('\n').slice(1))
-            ][0]?.trim() || null;
+         processPath = [...stdout.trim().split('\n').slice(1)][0]?.trim() || null;
 
+         // if(!isModuleGetIPathExist()) return null;
+         // const cmd = `build\\getIPath.exe`;
+         // const { stdout } = await execProms(cmd);
 
-            // if(!isModuleGetIPathExist()) return null;
-            // const cmd = `build\\getIPath.exe`;
-            // const { stdout } = await execProms(cmd);
+         // const lineWithTarget = stdout.split('\n').find(line => line.includes(targetProcess));
+         // if(!lineWithTarget) return null;
 
-            // const lineWithTarget = stdout.split('\n').find(line => line.includes(targetProcess));
-            // if(!lineWithTarget) return null;
-
-            // // each line look like this: `PID: 22880, Path: C:\Windows\System32\Taskmgr.exe`
-            // processPath = lineWithTarget.split(',').at(-1)
-            //    .split(':').at(-1)
-            //    .trim() || null;
-            break;
-         }
+         // // each line look like this: `PID: 22880, Path: C:\Windows\System32\Taskmgr.exe`
+         // processPath = lineWithTarget.split(',').at(-1)
+         //    .split(':').at(-1)
+         //    .trim() || null;
+         break;
+      }
       default:
          // I don't know how to get the path of a process on other platforms T.T
          throw new Error('This function is only available on Windows');
@@ -74,30 +71,24 @@ async function getProcessPath(targetProcess) {
    return processPath;
 }
 
-
-
-
-
 /**
  * @param {string} predicateStr
  * @param {*} value value to be tested
  * @returns {boolean} predicate result
  */
 function predicate(predicateStr, value) {
-   if(predicateStr.startsWith('$regex:')) {
+   if (predicateStr.startsWith('$regex:')) {
       try {
          const regex = new RegExp(predicateStr.slice(7));
          return regex.test(value);
       } catch (e) {
          throw new Error('Invalid regex: ' + e.message);
       }
-   }
-   else if(predicateStr.startsWith('$if:')) {
+   } else if (predicateStr.startsWith('$if:')) {
       const eval_s = new Function('key', `return (${predicateStr.slice(4)})`);
       return eval_s(value);
-   }
-   else if(predicateStr.startsWith('$type:')) {
-      if (value?.type !== undefined){
+   } else if (predicateStr.startsWith('$type:')) {
+      if (value?.type !== undefined) {
          return value.type === predicateStr.slice(6);
       }
 
@@ -106,8 +97,7 @@ function predicate(predicateStr, value) {
       if (type === 'array') return Array.isArray(value);
       if (type === 'object') return typeof value === 'object' && !Array.isArray(value);
       return typeof value === type;
-   }
-   else if(predicateStr.startsWith('$func:')) {
+   } else if (predicateStr.startsWith('$func:')) {
       const func = new Function('value', `${predicateStr.slice(6)};return false`);
       return func(value);
    }
@@ -121,8 +111,7 @@ function predicate(predicateStr, value) {
  * @returns {((key: string, value: any) => any)}
  */
 function createJSONReviver(functionBody = '') {
-   if(functionBody.startsWith('$func:'))
-      functionBody = functionBody.slice(6);
+   if (functionBody.startsWith('$func:')) functionBody = functionBody.slice(6);
 
    // @ts-expect-error type mismatch
    return new Function(
@@ -136,16 +125,17 @@ return value;`
  * open log file for writing
  */
 function openLogFile() {
-   const logFileTooLong = fs.existsSync(config.logFilePath)
-      && fs.statSync(config.logFilePath).size > config.logFileMaxSizeMB * 1024 * 1024;
+   const logFileTooLong =
+      fs.existsSync(config.logFilePath) &&
+      fs.statSync(config.logFilePath).size > config.logFileMaxSizeMB * 1024 * 1024;
 
    _global.logFileWS = fs.createWriteStream(config.logFilePath, {
-      flags: logFileTooLong? 'w' : 'a'
+      flags: logFileTooLong ? 'w' : 'a',
    });
 }
 
 function closeLogFile() {
-   if(_global.logFileWS){
+   if (_global.logFileWS) {
       _global.logFileWS.end();
    }
 }
@@ -159,25 +149,35 @@ function closeLogFile() {
  * @returns {T}
  */
 function writeLog(message, level = 3, print = false) {
-   if(typeof message !== 'string'){
+   if (typeof message !== 'string') {
       message = to.yuString(message);
    }
 
    switch (level) {
-      case 4: message = ncc('Dim') + '[debug] ' + ncc() + message; break;
-      case 3: message = ncc(color.mikuCyan) + '[info] ' + ncc() + message; break;
-      case 2: message = ncc('Yellow')+ '[warn] ' + ncc() + message; break;
-      case 1: message = ncc('Red')+'[error] ' + ncc() + message; break;
-      case 0: message = ncc('Red')+ncc('Bright')+'[critical] ' + ncc() + message; break;
+      case 4:
+         message = ncc('Dim') + '[debug] ' + ncc() + message;
+         break;
+      case 3:
+         message = ncc(color.mikuCyan) + '[info] ' + ncc() + message;
+         break;
+      case 2:
+         message = ncc('Yellow') + '[warn] ' + ncc() + message;
+         break;
+      case 1:
+         message = ncc('Red') + '[error] ' + ncc() + message;
+         break;
+      case 0:
+         message = ncc('Red') + ncc('Bright') + '[critical] ' + ncc() + message;
+         break;
    }
 
-   if(print&&!_global.disableTerminalLoggin){
+   if (print && !_global.disableTerminalLoggin) {
       terminal.log(message);
    }
 
    message = to.cleanString(message);
 
-   if(_global.logFileWS === null) return message;
+   if (_global.logFileWS === null) return message;
 
    const D = new Date();
    let time = [
@@ -186,13 +186,13 @@ function writeLog(message, level = 3, print = false) {
       D.getFullYear().toString(),
       D.getHours().toString(),
       D.getMinutes().toString(),
-      D.getSeconds().toString()
+      D.getSeconds().toString(),
    ].map(t => t.padStart(2, '0'));
 
    const content = to.strWrap(message, 130, {
-      firstIndent: `${time[0]+time[1]+time[2]}T${time[3]}:${time[4]}:${time[5]}| `,
+      firstIndent: `${time[0] + time[1] + time[2]}T${time[3]}:${time[4]}:${time[5]}| `,
       indent: '                 | ',
-      redundancyLv: -1
+      redundancyLv: -1,
    });
 
    _global.logFileWS.write(content);
@@ -203,12 +203,12 @@ function writeLog(message, level = 3, print = false) {
  * get game installation folder from game executable (not the launcher) path
  * @param {string} imagePath
  */
-function resolveGameInstallPath(imagePath){
+function resolveGameInstallPath(imagePath) {
    imagePath = path.normalize(imagePath);
    const folders = imagePath.split(path.sep);
 
-   for(let i = folders.length - 1; i > 0; i--){
-      if(folders[i] === config.getInstalledFolderName){
+   for (let i = folders.length - 1; i > 0; i--) {
+      if (folders[i] === config.getInstalledFolderName) {
          return folders.slice(0, i + 1).join(path.sep);
       }
    }
@@ -216,42 +216,38 @@ function resolveGameInstallPath(imagePath){
    return null;
 }
 
-
 function isModuleGetIPathExist() {
-   if(_global.moduleGetIPathExist === null){
+   if (_global.moduleGetIPathExist === null) {
       const modulePath = 'build/getIPath.exe';
       _global.moduleGetIPathExist = fs.existsSync(modulePath);
    }
    return _global.moduleGetIPathExist;
 }
 
-
-
 function canBuildGetIPath() {
-   if(process.platform !== 'win32') return false;
+   if (process.platform !== 'win32') return false;
    // if(!commandExists('g++')) return false;
-   if(!commandExists('npm')) return false;
+   if (!commandExists('npm')) return false;
 
    return true;
 }
 
-
-async function getFileHash(path, algorithm = config.fileDiffHash){
+async function getFileHash(path, algorithm = config.fileDiffHash) {
    return new Promise((resolve, reject) => {
       const hash = crypto.createHash(algorithm);
       const rs = fs.createReadStream(path);
       rs.on('error', reject);
       rs.on('data', chunk => hash.update(chunk));
       rs.on('end', () => resolve(hash.digest('hex')));
-  });
+   });
 }
 
 function objInsensitiveGet(obj, key) {
-   if(!obj || !key) return undefined;
+   if (!obj || !key) return undefined;
 
    const keys = Object.keys(obj);
-   for(let i = 0; i < keys.length; i++){
-      if(keys[i].toLowerCase() === key.toLowerCase()){
+   for (let i = 0; i < keys.length; i++) {
+      if (keys[i].toLowerCase() === key.toLowerCase()) {
          return obj[keys[i]];
       }
    }
@@ -267,20 +263,33 @@ function objInsensitiveGet(obj, key) {
  * @param {string} settingType
  * @throws {Error} if the type is not matched
  */
-function typeCheck(value, type, keyName, settingType){
-   if(value === undefined||value === null) return;
+function typeCheck(value, type, keyName, settingType) {
+   if (value === undefined || value === null) return;
 
    switch (type) {
       case 'bool':
-         assert(typeof value === 'boolean' || ![0, 1].includes(value), `value \`${keyName}:${value}\` of type "bool" must be a boolean, instead got ${typeof value}`);
+         assert(
+            typeof value === 'boolean' || ![0, 1].includes(value),
+            `value \`${keyName}:${value}\` of type "bool" must be a boolean, instead got ${typeof value}`
+         );
          break;
-      case 'string': assert(typeof value === 'string', `value \`${keyName}:${value}\` of type "string" must be a string, instead got ${typeof value}`);
+      case 'string':
+         assert(
+            typeof value === 'string',
+            `value \`${keyName}:${value}\` of type "string" must be a string, instead got ${typeof value}`
+         );
          break;
       case 'number':
-      case 'enum': assert(typeof value === 'number', `value \`${keyName}:${value}\` of type "number" or "enum" must be a number, instead got ${typeof value}`);
+      case 'enum':
+         assert(
+            typeof value === 'number',
+            `value \`${keyName}:${value}\` of type "number" or "enum" must be a number, instead got ${typeof value}`
+         );
          break;
       default:
-         throw new Error(`[Error] while writing: Type "${type}" is not supported for type "${settingType}". Found in key "${keyName}"`);
+         throw new Error(
+            `[Error] while writing: Type "${type}" is not supported for type "${settingType}". Found in key "${keyName}"`
+         );
    }
 }
 
@@ -292,7 +301,7 @@ class UniqueKey extends String {
    /**
     * @param {string} desc
     */
-   constructor(desc){
+   constructor(desc) {
       super(desc);
       this.symbol = Symbol(desc);
    }
@@ -305,8 +314,7 @@ class UniqueKey extends String {
    }
 
    [Symbol.toPrimitive](hint) {
-      return hint === 'string' || hint === 'default'
-         ? this.symbol.description : this.symbol;
+      return hint === 'string' || hint === 'default' ? this.symbol.description : this.symbol;
    }
 }
 
@@ -324,5 +332,5 @@ module.exports = {
    getFileHash,
    objInsensitiveGet,
    typeCheck,
-   UniqueKey
-}
+   UniqueKey,
+};

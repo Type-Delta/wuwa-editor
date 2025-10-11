@@ -1,4 +1,3 @@
-
 module.exports = {
    color: Object.freeze({
       gray1: 0x111111,
@@ -11,7 +10,7 @@ module.exports = {
       grayE: 0xeeeeee,
       mikuCyan: 0x23dbd2,
       aquaPink: 0xd149b1,
-      gold: 0xc19c00
+      gold: 0xc19c00,
    }),
    version: '1.5.0',
    tracer: null,
@@ -22,4 +21,4 @@ module.exports = {
    moduleGetIPathExist: null,
    isThisProcessElevated: null,
    disableTerminalLoggin: false,
-}
+};

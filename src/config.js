@@ -1,10 +1,9 @@
 const { readFileSync, existsSync, writeFileSync } = require('fs');
 const { stringifyConfig, parseConfig, writeConfig } = require('./helper/Tools.js');
 
-
 const CONFIG_PATH = './config.ini';
 const writeConfigOptions = {
-   ignoreList: ['loadConfig', 'writeConfig', 'logFilePath', 'backupFolder', 'fileDiffHash']
+   ignoreList: ['loadConfig', 'writeConfig', 'logFilePath', 'backupFolder', 'fileDiffHash'],
 };
 const DEFAULT_CONFIG = `
 ###################   wuwa-editor Configuration   ###################
@@ -13,7 +12,6 @@ const DEFAULT_CONFIG = `
 # Game instalation path
 # this folder should contain GameFolder (e.g. "Wuthering Waves Game") and launcher.exe
 `;
-
 
 class Config {
    /**
@@ -29,44 +27,40 @@ class Config {
    fileDiffHash = 'sha1';
 
    logFilePath = './wuwa-editor.log';
-   logFileMaxSizeMB =  1;
+   logFileMaxSizeMB = 1;
 
-
-   constructor(){
+   constructor() {
       this.loadConfig();
    }
 
-   loadConfig(){
+   loadConfig() {
       let CONFIG;
-      if(!existsSync(CONFIG_PATH)){
-         try{
+      if (!existsSync(CONFIG_PATH)) {
+         try {
             const strConfig = DEFAULT_CONFIG + stringifyConfig(this, writeConfigOptions);
 
             writeFileSync(CONFIG_PATH, strConfig, { encoding: 'utf-8' });
-         }catch{}
+         } catch {}
          return;
       }
 
-      CONFIG = parseConfig(readFileSync(CONFIG_PATH, { encoding:'utf-8' }));
+      CONFIG = parseConfig(readFileSync(CONFIG_PATH, { encoding: 'utf-8' }));
 
-      if(!CONFIG){
+      if (!CONFIG) {
          return;
       }
 
-
-      if(CONFIG.gameInstalledPath) this.gameInstalledPath = CONFIG.gameInstalledPath;
-      if(CONFIG.gameClientName) this.gameClientName = CONFIG.gameClientName;
-      if(CONFIG.patchJSONLocation) this.patchJSONLocation = CONFIG.patchJSONLocation;
-      if(CONFIG.backupFolder) this.backupFolder = CONFIG.backupFolder;
-      if(CONFIG.maxBackup != null) this.maxBackup = parseInt(CONFIG.maxBackup);
+      if (CONFIG.gameInstalledPath) this.gameInstalledPath = CONFIG.gameInstalledPath;
+      if (CONFIG.gameClientName) this.gameClientName = CONFIG.gameClientName;
+      if (CONFIG.patchJSONLocation) this.patchJSONLocation = CONFIG.patchJSONLocation;
+      if (CONFIG.backupFolder) this.backupFolder = CONFIG.backupFolder;
+      if (CONFIG.maxBackup != null) this.maxBackup = parseInt(CONFIG.maxBackup);
       this.doBackup = CONFIG.doBackup;
    }
 
-   writeConfig(){
+   writeConfig() {
       writeConfig(this, CONFIG_PATH, writeConfigOptions);
    }
 }
 
-
-
-if(!(module.exports instanceof Config)) module.exports = new Config;
+if (!(module.exports instanceof Config)) module.exports = new Config();

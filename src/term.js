@@ -1,4 +1,3 @@
-
 const fs = require('fs');
 
 const to = require('./helper/Tools');
@@ -7,12 +6,9 @@ const { ncc, strSurround } = to;
 const Terminal = require('./helper/terminal');
 const { version } = require('./global.js');
 
-
 to._modules.fs = fs;
 
-
 const terminal = new Terminal([], '', false);
-
 
 terminal.inputDebugMode = false;
 terminal.allowedInputs = true;
@@ -21,10 +17,6 @@ terminal.initialize(`
 ${ncc(0x23dbd2)} │ ${strSurround('WuWa Editor', ' ', 40)}
  │ ${strSurround('────', ' ', 40)}
  │ Wuthering Waves advanced settings editor
- │ ${ncc('White')}Version: ${version + ncc('Reset')}\n\n`
-);
-
-
-
+ │ ${ncc('White')}Version: ${version + ncc('Reset')}\n\n`);
 
 module.exports = terminal;

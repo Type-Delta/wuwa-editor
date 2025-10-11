@@ -37,7 +37,7 @@ to._modules.fs = fs;
  *       values: {[key: string]: string}[]
  *    }
  * }}} SrcKBTupleMap
-*/
+ */
 
 /**
  * @typedef {object} KeyBind
@@ -69,8 +69,8 @@ class KeyBind {
       Ctrl: false,
    };
 
-   setModifier(key, value = !this.modifier[key]){
-      if(this.type !== 'keyboard'){
+   setModifier(key, value = !this.modifier[key]) {
+      if (this.type !== 'keyboard') {
          this.type = 'keyboard';
          this.value = null;
       }
@@ -83,32 +83,31 @@ class KeyBind {
     * @param {Keys|(Keys)[]} newValue
     * @param {DeviceTypes|GameSettingPatch} typeRef
     */
-   set(newValue, typeRef){
-      if(typeof newValue === 'string') this.value = [newValue];
+   set(newValue, typeRef) {
+      if (typeof newValue === 'string') this.value = [newValue];
       else this.value = newValue;
 
-      this.type = this.#resolveType(typeRef, newValue instanceof Array? newValue[0]: newValue);
+      this.type = this.#resolveType(typeRef, newValue instanceof Array ? newValue[0] : newValue);
    }
-
 
    /**
     * append a new key to the keybind
     * @param {Keys|(Keys)[]} newValue
     * @param {DeviceTypes|GameSettingPatch} typeRef
     */
-   append(newValue, typeRef){
-      const currType = this.#resolveType(typeRef, newValue instanceof Array? newValue[0]: newValue);
+   append(newValue, typeRef) {
+      const currType = this.#resolveType(typeRef, newValue instanceof Array ? newValue[0] : newValue);
 
-      if(currType !== this.type){
+      if (currType !== this.type) {
          this.type = currType;
          this.value = null;
       }
 
-      if(!this.value) this.value = [];
+      if (!this.value) this.value = [];
 
-      if(newValue instanceof Array) this.value.push(...newValue);
+      if (newValue instanceof Array) this.value.push(...newValue);
       else {
-         if(this.value instanceof Array) this.value.push(newValue);
+         if (this.value instanceof Array) this.value.push(newValue);
          else this.value = [this.value, newValue];
       }
    }
@@ -117,12 +116,12 @@ class KeyBind {
     * return the last key from the keybind and remove it
     * @returns {Keys|null}
     */
-   pop(){
+   pop() {
       let removedValue = null;
 
-      if(this.value instanceof Array){
+      if (this.value instanceof Array) {
          removedValue = this.value.pop();
-         if(this.value.length <= 0) this.value = null;
+         if (this.value.length <= 0) this.value = null;
          return removedValue;
       }
 
@@ -135,25 +134,37 @@ class KeyBind {
     * clone the KeyBind object
     * @returns {KeyBind}
     */
-   clone(){
+   clone() {
       const clone = new KeyBind();
       clone.value = _.cloneDeep(this.value);
       clone.type = this.type;
-      clone.modifier = {...this.modifier};
+      clone.modifier = { ...this.modifier };
       return clone;
    }
 
-   toString(){
+   toString() {
       const _type =
-         this.type === 'keyboard' ? '⌨️ Keyb.' : (
-            this.type === 'mouse' ? '🖱️ Mouse' : (
-               this.type === 'controller' ? '🎮 Cont.': ''));
+         this.type === 'keyboard'
+            ? '⌨️ Keyb.'
+            : this.type === 'mouse'
+              ? '🖱️ Mouse'
+              : this.type === 'controller'
+                ? '🎮 Cont.'
+                : '';
 
-      if(this.value instanceof Array){
-         return ncc(color.gold)+`${_type} ${ncc(color.gray5)}${ncc(color.aquaPink)}${this.modifier.Ctrl?'Ctrl+':''}${this.modifier.Shift?'Shift+':''}${this.modifier.Alt?'Alt+':''}${this.modifier.Cmd?'⌘+':''}` +
-            this.value.map(v => `${(v?ncc(color.gray9)+v:ncc(color.gray6)+'[empty]')+ncc(color.gray7)}`).join('+');
+      if (this.value instanceof Array) {
+         return (
+            ncc(color.gold) +
+            `${_type} ${ncc(color.gray5)}${ncc(color.aquaPink)}${this.modifier.Ctrl ? 'Ctrl+' : ''}${this.modifier.Shift ? 'Shift+' : ''}${this.modifier.Alt ? 'Alt+' : ''}${this.modifier.Cmd ? '⌘+' : ''}` +
+            this.value
+               .map(v => `${(v ? ncc(color.gray9) + v : ncc(color.gray6) + '[empty]') + ncc(color.gray7)}`)
+               .join('+')
+         );
       }
-      return ncc(color.gold)+`${_type} ${ncc(color.gray5)}${ncc(color.aquaPink)}${this.modifier.Ctrl?'Ctrl+':''}${this.modifier.Shift?'Shift+':''}${this.modifier.Alt?'Alt+':''}${this.modifier.Cmd?'⌘+':''}${(this.value?ncc(color.gray9)+this.value:ncc(color.gray6)+'[empty]')+ncc(color.gray7)}`;
+      return (
+         ncc(color.gold) +
+         `${_type} ${ncc(color.gray5)}${ncc(color.aquaPink)}${this.modifier.Ctrl ? 'Ctrl+' : ''}${this.modifier.Shift ? 'Shift+' : ''}${this.modifier.Alt ? 'Alt+' : ''}${this.modifier.Cmd ? '⌘+' : ''}${(this.value ? ncc(color.gray9) + this.value : ncc(color.gray6) + '[empty]') + ncc(color.gray7)}`
+      );
    }
 
    /**
@@ -162,20 +173,20 @@ class KeyBind {
     * @param {Keys} key
     * @returns {DeviceTypes}
     */
-   #resolveType(typeRef, key){
+   #resolveType(typeRef, key) {
       let _type = null;
 
-      if(typeof typeRef !== 'string'){
-         for(const device in typeRef.bindingsDeclaration){
-            if(device === 'keyboard'||device === 'modifiers') continue;
+      if (typeof typeRef !== 'string') {
+         for (const device in typeRef.bindingsDeclaration) {
+            if (device === 'keyboard' || device === 'modifiers') continue;
 
-            if(typeRef.bindingsDeclaration[device][key] !== undefined){
+            if (typeRef.bindingsDeclaration[device][key] !== undefined) {
                _type = device;
                break;
             }
          }
-         if(!_type) return 'keyboard';
-      }else{
+         if (!_type) return 'keyboard';
+      } else {
          switch (typeRef) {
             case 'keyboard':
             case 'mouse':
@@ -187,7 +198,7 @@ class KeyBind {
          }
       }
 
-      if(_type !== 'keyboard'){
+      if (_type !== 'keyboard') {
          this.modifier = {
             Cmd: false,
             Alt: false,
@@ -200,7 +211,7 @@ class KeyBind {
       return _type;
    }
 
-   constructor(value = null, type = null){
+   constructor(value = null, type = null) {
       this.value = value;
       this.type = type;
    }
@@ -234,7 +245,7 @@ class AxisBind {
     * @param {Axis} newValue
     * @param {DeviceTypes|GameSettingPatch} typeRef
     */
-   set(newValue, typeRef){
+   set(newValue, typeRef) {
       this.value = newValue;
 
       this.type = this.#resolveType(typeRef, newValue);
@@ -244,7 +255,7 @@ class AxisBind {
     * @param {Axis} value
     * @param {DeviceTypes|GameSettingPatch} typeRef
     */
-   append(value, typeRef){
+   append(value, typeRef) {
       // keep the same name for both Class to avoid writing checks wether it's AxisBind or KeyBind
       this.set(value, typeRef);
    }
@@ -255,7 +266,7 @@ class AxisBind {
     * (this function should be named `clear()` but I'm not doing it)
     * @returns {Axis|null}
     */
-   pop(){
+   pop() {
       let removedValue = this.value;
       this.value = null;
       return removedValue;
@@ -265,7 +276,7 @@ class AxisBind {
     * clone the AxisBind object
     * @returns {AxisBind}
     */
-   clone(){
+   clone() {
       const clone = new AxisBind();
       clone.value = _.cloneDeep(this.value);
       clone.type = this.type;
@@ -273,16 +284,23 @@ class AxisBind {
       return clone;
    }
 
-   toString(){
+   toString() {
       const _type =
-         this.type === 'keyboard' ? '⌨️ Keyb.' : (
-            this.type === 'mouse' ? '🖱️ Mouse' : (
-               this.type === 'controller' ? '🎮 Cont.': ''));
+         this.type === 'keyboard'
+            ? '⌨️ Keyb.'
+            : this.type === 'mouse'
+              ? '🖱️ Mouse'
+              : this.type === 'controller'
+                ? '🎮 Cont.'
+                : '';
 
-      if(typeof this.value !== 'string'){
+      if (typeof this.value !== 'string') {
          throw new Error('AxisBind cannot have multiple values!');
       }
-      return ncc(color.gold)+`${_type} ${ncc(color.gray5)}${ncc(color.aquaPink)}${this.scale * 100}% ${(this.value?ncc(color.gray9)+this.value:ncc(color.gray6)+'[empty]')+ncc(color.gray7)}`;
+      return (
+         ncc(color.gold) +
+         `${_type} ${ncc(color.gray5)}${ncc(color.aquaPink)}${this.scale * 100}% ${(this.value ? ncc(color.gray9) + this.value : ncc(color.gray6) + '[empty]') + ncc(color.gray7)}`
+      );
    }
 
    /**
@@ -291,20 +309,20 @@ class AxisBind {
     * @param {Axis} key
     * @returns {DeviceTypes}
     */
-   #resolveType(typeRef, key){
+   #resolveType(typeRef, key) {
       let _type = null;
 
-      if(typeof typeRef !== 'string'){
-         for(const device in typeRef.bindingsDeclaration){
-            if(device === 'keyboard'||device === 'modifiers') continue;
+      if (typeof typeRef !== 'string') {
+         for (const device in typeRef.bindingsDeclaration) {
+            if (device === 'keyboard' || device === 'modifiers') continue;
 
-            if(typeRef.bindingsDeclaration[device][key] !== undefined){
+            if (typeRef.bindingsDeclaration[device][key] !== undefined) {
                _type = device;
                break;
             }
          }
-         if(!_type) return 'keyboard';
-      }else{
+         if (!_type) return 'keyboard';
+      } else {
          switch (typeRef) {
             case 'keyboard':
             case 'mouse':
@@ -320,25 +338,19 @@ class AxisBind {
       return _type;
    }
 
-   constructor(value = null, type = null){
+   constructor(value = null, type = null) {
       this.value = value;
       this.type = type;
    }
 }
 
-
-
-
-
-
 /**
  * @param {string} configPath full path to the config file
  */
-function readPlainText(configPath){
+function readPlainText(configPath) {
    try {
       return fs.readFileSync(configPath, { encoding: 'utf-8' });
-   }
-   catch (e) {
+   } catch (e) {
       writeLog(`Error reading config from "${configPath}": ${e.message}`, 1, true);
       writeLog(to.yuString(e), 2);
       return null;
@@ -349,38 +361,38 @@ function readPlainText(configPath){
  * @param {string} filePath full path to the database file
  * @param {SettingSrcMetadata} settingSrc
  */
-async function readSQLite(filePath, settingSrc){
-   if(settingSrc.manifest?.selectedTable === undefined){
-      writeLog(`unable to read from SQLite database: missing "selectedTable" property in source metadata`, 2, true);
+async function readSQLite(filePath, settingSrc) {
+   if (settingSrc.manifest?.selectedTable === undefined) {
+      writeLog(
+         `unable to read from SQLite database: missing "selectedTable" property in source metadata`,
+         2,
+         true
+      );
       writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
       return null;
    }
 
-   if(filePath.startsWith('.'))
-      filePath = path.resolve(config.gameInstalledPath, filePath);
+   if (filePath.startsWith('.')) filePath = path.resolve(config.gameInstalledPath, filePath);
 
    /**
     * @type {any}
     */
    let db = null;
-   let rawSettings = new Map;
+   let rawSettings = new Map();
    try {
       writeLog(`Opening SQLite database from "${filePath}"`);
       db = await sqlite.open(filePath);
 
-      if(settingSrc.manifest?.acceptedGroups?.length){
-         for(const group of settingSrc.manifest.acceptedGroups){
+      if (settingSrc.manifest?.acceptedGroups?.length) {
+         for (const group of settingSrc.manifest.acceptedGroups) {
             let query = `SELECT key, value FROM ${settingSrc.manifest.selectedTable} WHERE key = \'${group}\'`;
-            if(settingSrc.manifest?.filter && settingSrc.manifest.filter.startsWith('$sql:'))
+            if (settingSrc.manifest?.filter && settingSrc.manifest.filter.startsWith('$sql:'))
                query += ' AND ' + settingSrc.manifest.filter.slice(5);
 
             const result = await db.all(query);
 
-            if(!result.length){
-               writeLog(
-                  `SQLite failed to resolve setting from "${filePath}"`,
-                  2, true
-               );
+            if (!result.length) {
+               writeLog(`SQLite failed to resolve setting from "${filePath}"`, 2, true);
                writeLog('failed reason: "no result"', 2);
                return null;
             }
@@ -389,45 +401,34 @@ async function readSQLite(filePath, settingSrc){
             writeLog(`query result: ${to.yuString([...result])}`);
             rawSettings.set(group, result[0].value);
          }
-      }
-      else {
+      } else {
          let query = `SELECT key, value FROM ${settingSrc.manifest.selectedTable}`;
-         if(settingSrc.manifest?.filter && settingSrc.manifest.filter.startsWith('$sql:'))
+         if (settingSrc.manifest?.filter && settingSrc.manifest.filter.startsWith('$sql:'))
             query += ' WHERE ' + settingSrc.manifest.filter.slice(5);
 
          const result = await db.all(query);
 
-         if(!result.length){
-            writeLog(
-               `SQLite failed to resolve setting from "${filePath}"`,
-               2, true
-            );
+         if (!result.length) {
+            writeLog(`SQLite failed to resolve setting from "${filePath}"`, 2, true);
             writeLog('failed reason: "no result"', 2);
             return null;
          }
 
          writeLog(`query result: ${to.yuString([...result])}`);
-         for(const row of result){
+         for (const row of result) {
             rawSettings.set(row.key, row.value);
          }
       }
 
       return rawSettings;
-
    } catch (e) {
-      writeLog(
-         `Error loading SQLite from "${filePath}": ${e.message}`,
-         2, true
-      );
+      writeLog(`Error loading SQLite from "${filePath}": ${e.message}`, 2, true);
       writeLog(to.yuString(e), 2);
       return null;
-
    } finally {
       db?.close();
    }
 }
-
-
 
 /**
  * load `ini` dataType config file
@@ -435,25 +436,25 @@ async function readSQLite(filePath, settingSrc){
  * @param {SettingSrcMetadata} settingSrc
  * @returns {Promise<{[group: string]: any}|null>} a rough parsed object of the config file, where keys in the first level are group names
  */
-async function loadIniKeyVal(configPath, settingSrc){
+async function loadIniKeyVal(configPath, settingSrc) {
    let strSettings = null;
-   switch(settingSrc.type){
+   switch (settingSrc.type) {
       case 'plainText':
          strSettings = readPlainText(configPath);
          break;
       case 'sqlite':
          strSettings = await readSQLite(configPath, settingSrc);
-         if(!strSettings) return null;
+         if (!strSettings) return null;
 
          strSettings = [...strSettings.values()].join('\n');
          break;
    }
 
    return to.parseConfig(strSettings, null, {
-      ignoreGroups: false, multiValues: true
+      ignoreGroups: false,
+      multiValues: true,
    });
 }
-
 
 /**
  * load `JSON` dataType config file
@@ -464,30 +465,30 @@ async function loadIniKeyVal(configPath, settingSrc){
 async function loadJSON(configPath, settingSrc) {
    let strSettings = null;
    let settings = {};
-   switch(settingSrc.type){
+   switch (settingSrc.type) {
       case 'plainText':
          strSettings = readPlainText(configPath);
          settings['$null'] = JSON.parse(strSettings); // no group
          break;
       case 'sqlite':
-         if(typeof settingSrc.manifest.Reviver == 'string'){
+         if (typeof settingSrc.manifest.Reviver == 'string') {
             writeLog('program not properly initialized: Reviver is not a function', 2);
             return null;
          }
 
          strSettings = await readSQLite(configPath, settingSrc);
-         if(!strSettings) return null;
+         if (!strSettings) return null;
 
          strSettings = [...strSettings.values()];
 
          let groupIndex = 0;
-         for(let group of settingSrc.manifest.acceptedGroups ?? ['$null']){
+         for (let group of settingSrc.manifest.acceptedGroups ?? ['$null']) {
             settings[group] = JSON.parse(strSettings[groupIndex++], settingSrc.manifest.Reviver);
          }
 
-         if(settingSrc.manifest.rootProperty){
-            for(const group in settings){
-               if(settings[group][settingSrc.manifest.rootProperty] == undefined) continue;
+         if (settingSrc.manifest.rootProperty) {
+            for (const group in settings) {
+               if (settings[group][settingSrc.manifest.rootProperty] == undefined) continue;
                settings[group] = settings[group][settingSrc.manifest.rootProperty];
             }
          }
@@ -496,7 +497,6 @@ async function loadJSON(configPath, settingSrc) {
 
    return settings;
 }
-
 
 /**
  * load `KBTupleMap` dataType config file
@@ -510,14 +510,15 @@ async function loadKBTupleMap(configPath, settingSrc) {
    /**
     * @type {SrcKBTupleMap}
     */
-   let settings = {}, currGroupName = '$null';
-   switch(settingSrc.type){
+   let settings = {},
+      currGroupName = '$null';
+   switch (settingSrc.type) {
       case 'plainText':
          strSettings = readPlainText(configPath);
          break;
       case 'sqlite':
          strSettings = await readSQLite(configPath, settingSrc);
-         if(!strSettings) return null;
+         if (!strSettings) return null;
 
          strSettings = [...strSettings.values()].join('\n');
          break;
@@ -526,27 +527,28 @@ async function loadKBTupleMap(configPath, settingSrc) {
    for (let line of strSettings.split('\n')) {
       line = line.trim();
 
-      if (!line||line.startsWith(';')) continue;
-      if(line.startsWith('[')){
+      if (!line || line.startsWith(';')) continue;
+      if (line.startsWith('[')) {
          currGroupName = line.slice(1, -1);
          continue;
       }
 
       const typeTupleSplit = line.indexOf('=');
-      let thisSetting = {}, thisKey = null;
+      let thisSetting = {},
+         thisKey = null;
       // +2 and -1 are to remove the () from the tuple
       let [type, tuple] = [line.slice(0, typeTupleSplit), line.slice(typeTupleSplit + 2, -1)];
 
-      if(settingSrc.manifest?.filter && !predicate(settingSrc.manifest.filter, { type, value: tuple }))
+      if (settingSrc.manifest?.filter && !predicate(settingSrc.manifest.filter, { type, value: tuple }))
          continue;
 
       for (const pair of tuple.split(',')) {
          let [pKey, pVal] = pair.split('=');
 
-         if(!pKey || !pVal) continue;
-         if(pVal[0] === '"') pVal = pVal.slice(1, -1);
+         if (!pKey || !pVal) continue;
+         if (pVal[0] === '"') pVal = pVal.slice(1, -1);
 
-         if(pKey === 'ActionName'||pKey === 'AxisName'){
+         if (pKey === 'ActionName' || pKey === 'AxisName') {
             thisKey = pVal;
             continue;
          }
@@ -554,18 +556,16 @@ async function loadKBTupleMap(configPath, settingSrc) {
          thisSetting[pKey] = pVal;
       }
 
-      if(!settings[currGroupName])
-         settings[currGroupName] = {};
+      if (!settings[currGroupName]) settings[currGroupName] = {};
 
-      if(!settings[currGroupName][thisKey]) {
+      if (!settings[currGroupName][thisKey]) {
          settings[currGroupName][thisKey] = {
             type: null,
-            values: []
+            values: [],
          };
       }
 
-      if(!settings[currGroupName][thisKey].values)
-         settings[currGroupName][thisKey].values = [];
+      if (!settings[currGroupName][thisKey].values) settings[currGroupName][thisKey].values = [];
 
       // @ts-expect-error
       settings[currGroupName][thisKey].type = type;
@@ -583,17 +583,17 @@ async function loadKBTupleMap(configPath, settingSrc) {
  * @returns {Promise<{[group: string]: any}|null>} a rough parsed object of the config file, where keys in the first level are group names
  *
  */
-async function loadLiteral(configPath, settingSrc){
+async function loadLiteral(configPath, settingSrc) {
    let rawSettings = null;
    let settings = {};
-   switch(settingSrc.type){
+   switch (settingSrc.type) {
       case 'sqlite':
          rawSettings = await readSQLite(configPath, settingSrc);
-         if(!rawSettings) return null;
+         if (!rawSettings) return null;
          break;
    }
 
-   if(typeof settingSrc.manifest.readMapper == 'function'){
+   if (typeof settingSrc.manifest.readMapper == 'function') {
       rawSettings = to.remap(rawSettings, settingSrc.manifest.readMapper);
    }
 
@@ -601,41 +601,36 @@ async function loadLiteral(configPath, settingSrc){
    return settings;
 }
 
-
 /**
  * @param {any} rawSetting raw settings of this source file
  * @param {string} settingKey
  * @param {string} srcFile file path this setting originated from
  * @return {ParsedGameSettingObj|null} parsed setting object
  */
-function parseIniKeyVal(rawSetting, settingKey, srcFile, caseSensitive = true){
+function parseIniKeyVal(rawSetting, settingKey, srcFile, caseSensitive = true) {
    let setting = undefined;
    let group = null;
 
-   if(caseSensitive){
-      for(group in rawSetting){
-         if(rawSetting[group][settingKey] !== undefined){
+   if (caseSensitive) {
+      for (group in rawSetting) {
+         if (rawSetting[group][settingKey] !== undefined) {
             setting = rawSetting[group];
             break;
          }
       }
-   }
-   else {
-      for(group in rawSetting){
-         if(objInsensitiveGet(rawSetting[group], settingKey) !== undefined){
+   } else {
+      for (group in rawSetting) {
+         if (objInsensitiveGet(rawSetting[group], settingKey) !== undefined) {
             setting = rawSetting[group];
             break;
          }
       }
    }
 
-   let value = caseSensitive? setting?.[settingKey] : objInsensitiveGet(setting, settingKey);
+   let value = caseSensitive ? setting?.[settingKey] : objInsensitiveGet(setting, settingKey);
 
-   if(value == undefined){
-      writeLog(
-         `Key "${settingKey}" not found in source config "${srcFile}"`,
-         2, true
-      );
+   if (value == undefined) {
+      writeLog(`Key "${settingKey}" not found in source config "${srcFile}"`, 2, true);
       return null;
    }
 
@@ -643,8 +638,7 @@ function parseIniKeyVal(rawSetting, settingKey, srcFile, caseSensitive = true){
       case 'boolean':
          return { value, type: 'bool', group };
       case 'string':
-         if(!value||value == 'null'||value == 'undefined')
-            return {value: null, type: 'string', group };
+         if (!value || value == 'null' || value == 'undefined') return { value: null, type: 'string', group };
          return { value, type: 'string', group };
       case 'number':
          return { value, type: 'number', group };
@@ -653,7 +647,6 @@ function parseIniKeyVal(rawSetting, settingKey, srcFile, caseSensitive = true){
    }
 }
 
-
 /**
  * @param {SrcKBTupleMap} rawSetting
  * @param {string} settingKey
@@ -661,30 +654,29 @@ function parseIniKeyVal(rawSetting, settingKey, srcFile, caseSensitive = true){
  * @param {*} combineActionMap
  * @return {ParsedGameSettingObj|null} parsed setting object
  */
-function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap, caseSensitive = true){
+function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap, caseSensitive = true) {
    let setting = undefined;
    let group = null;
 
-   if(caseSensitive){
-      for(group in rawSetting){
-         if(rawSetting[group][settingKey] !== undefined){
+   if (caseSensitive) {
+      for (group in rawSetting) {
+         if (rawSetting[group][settingKey] !== undefined) {
             setting = rawSetting[group];
             break;
          }
       }
-   }
-   else {
-      for(group in rawSetting){
-         if(objInsensitiveGet(rawSetting[group], settingKey) !== undefined){
+   } else {
+      for (group in rawSetting) {
+         if (objInsensitiveGet(rawSetting[group], settingKey) !== undefined) {
             setting = rawSetting[group];
             break;
          }
       }
    }
 
-   let value = caseSensitive? setting?.[settingKey] : objInsensitiveGet(setting, settingKey);
+   let value = caseSensitive ? setting?.[settingKey] : objInsensitiveGet(setting, settingKey);
 
-   if(value === undefined){
+   if (value === undefined) {
       writeLog(`Key "${settingKey}" not found in source config`, 2, true);
       return null;
    }
@@ -692,28 +684,30 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap, caseSe
    let values = [];
    /**@type {OptionPatchOptionTypes} */
    let type = null;
-   if(value.type === 'AxisMappings'){
+   if (value.type === 'AxisMappings') {
       type = 'axis';
 
-      for(let eachKeybind of value.values){
+      for (let eachKeybind of value.values) {
          /**
           * @type {AxisBind}
           */
          let binding = new AxisBind();
          let isAlternative = false; // for controller with alternative keybinds
 
-         for(let [feature, fValue] of Object.entries(eachKeybind)){
-            if(feature === 'Scale'){
+         for (let [feature, fValue] of Object.entries(eachKeybind)) {
+            if (feature === 'Scale') {
                binding.scale = parseFloat(fValue);
                continue;
             }
 
-            if(feature === 'Key'){
+            if (feature === 'Key') {
                const { key = null, deviceType = null } = getKeyFromBindingDeclaration(
-                  [patch.axisDeclaration, patch.bindingsDeclaration], fValue, ['modifiers']
+                  [patch.axisDeclaration, patch.bindingsDeclaration],
+                  fValue,
+                  ['modifiers']
                );
 
-               if(fValue.startsWith('GenericUSB')){
+               if (fValue.startsWith('GenericUSB')) {
                   isAlternative = true;
                   break;
                }
@@ -726,22 +720,22 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap, caseSe
             }
          }
 
-         if(isAlternative) continue;
+         if (isAlternative) continue;
          values.push(binding);
       }
-   }
-   else {
+   } else {
       type = 'bindings';
       /**combineAction is stored separately in LocalStorage.db, here we combine them
        *  @type {string[][]|[]}
        */
-      const thisCombineAction = (combineActionMap instanceof Map
-         ? combineActionMap.get(settingKey)?.map(v => {
-            return { Key: v }
-         })
-         : null) ?? [];
+      const thisCombineAction =
+         (combineActionMap instanceof Map
+            ? combineActionMap.get(settingKey)?.map(v => {
+                 return { Key: v };
+              })
+            : null) ?? [];
 
-      for(let eachKeybind of [...value.values, ...thisCombineAction]){
+      for (let eachKeybind of [...value.values, ...thisCombineAction]) {
          // terminal.log(eachKeybind);
          /**
           * @type {KeyBind}
@@ -757,36 +751,37 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap, caseSe
          // feature: bAlt, fValue: False
          // ...       (^ need key translation v)
          // feature: Key, fValue: Gamepad_FaceButton_Right
-         for(let [feature, fValue] of Object.entries(eachKeybind)){
+         for (let [feature, fValue] of Object.entries(eachKeybind)) {
             // @ts-expect-error
             let valueList = fValue instanceof Array ? fValue : [fValue];
 
-            for(let eachFValue of valueList){
+            for (let eachFValue of valueList) {
                const { key = null, deviceType = null } = getKeyFromBindingDeclaration(
                   patch.bindingsDeclaration,
-                  feature !== 'Key'? feature: eachFValue
+                  feature !== 'Key' ? feature : eachFValue
                );
 
-               if(feature === 'Key'&&deviceType !== 'modifiers'){
-                  if(eachFValue.startsWith('GenericUSB')){
+               if (feature === 'Key' && deviceType !== 'modifiers') {
+                  if (eachFValue.startsWith('GenericUSB')) {
                      isAlternative = true;
                      break;
                   }
 
                   // @ts-expect-error we already filtered out the Axis and modifiers type
-                  if(binding.value instanceof Array) binding.value.push(key); // @ts-expect-error
+                  if (binding.value instanceof Array)
+                     binding.value.push(key); // @ts-expect-error
                   else binding.value = [key];
                   binding.type = deviceType;
                   continue;
                }
 
-               if(key === 'Shift'||key === 'Ctrl'||key === 'Alt'||key === 'Cmd'){
+               if (key === 'Shift' || key === 'Ctrl' || key === 'Alt' || key === 'Cmd') {
                   binding.modifier[key] = eachFValue === 'True';
                }
             }
          }
 
-         if(isAlternative) continue;
+         if (isAlternative) continue;
          values.push(binding);
       }
    }
@@ -795,10 +790,9 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap, caseSe
    return {
       value: values,
       type,
-      group
-   }
+      group,
+   };
 }
-
 
 /**
  * @param {any} rawSetting raw settings of this source file
@@ -807,46 +801,40 @@ function parseKBTupleMap(rawSetting, settingKey, patch, combineActionMap, caseSe
  * @param {boolean} typeParsing whether to parse the value to JavaScript type
  * @return {ParsedGameSettingObj|null} parsed setting object
  */
-function parseLiteral(rawSetting, settingKey, srcFile, typeParsing, caseSensitive = true){
+function parseLiteral(rawSetting, settingKey, srcFile, typeParsing, caseSensitive = true) {
    let setting = undefined;
    let group = null;
 
-   if(caseSensitive){
-      for(group in rawSetting){
-         if(rawSetting[group][settingKey] !== undefined){
+   if (caseSensitive) {
+      for (group in rawSetting) {
+         if (rawSetting[group][settingKey] !== undefined) {
             setting = rawSetting[group];
             break;
          }
       }
-   }
-   else {
-      for(group in rawSetting){
-         if(objInsensitiveGet(rawSetting[group], settingKey) !== undefined){
+   } else {
+      for (group in rawSetting) {
+         if (objInsensitiveGet(rawSetting[group], settingKey) !== undefined) {
             setting = rawSetting[group];
             break;
          }
       }
    }
 
-   let value = caseSensitive? setting?.[settingKey] : objInsensitiveGet(setting, settingKey);
+   let value = caseSensitive ? setting?.[settingKey] : objInsensitiveGet(setting, settingKey);
 
-   if(value === undefined){
-      writeLog(
-         `Key "${settingKey}" not found in source config "${srcFile}"`,
-         2, true
-      );
+   if (value === undefined) {
+      writeLog(`Key "${settingKey}" not found in source config "${srcFile}"`, 2, true);
       return null;
    }
 
-   if(typeParsing)
-      value = to.parseValue(value);
+   if (typeParsing) value = to.parseValue(value);
 
    switch (typeof value) {
       case 'boolean':
          return { value, type: 'bool', group };
       case 'string':
-         if(!value||value == 'null'||value == 'undefined')
-            return {value: null, type: 'string', group };
+         if (!value || value == 'null' || value == 'undefined') return { value: null, type: 'string', group };
          return { value, type: 'string', group };
       case 'number':
          return { value, type: 'number', group };
@@ -855,42 +843,37 @@ function parseLiteral(rawSetting, settingKey, srcFile, typeParsing, caseSensitiv
    }
 }
 
-
 /**
  * @param {string} settingScrPath FULL PATH to the setting source file
  * @param {SettingSrcMetadata} settingSrc
  * @param {Map<string, ParsedGameSettingObj>} settings
  */
-async function writeIniKeyVal(settingScrPath, settingSrc, settings){
-   let noGroup = to.remap(Object.fromEntries(settings),
-      (key, value) =>  {
-         typeCheck(value.value, value.type, value.key, "Ini-KeVal");
+async function writeIniKeyVal(settingScrPath, settingSrc, settings) {
+   let noGroup = to.remap(Object.fromEntries(settings), (key, value) => {
+      typeCheck(value.value, value.type, value.key, 'Ini-KeVal');
 
-         return {
-            key: value.key,
-            value: {
-               value: value.value,
-               group: value.group
-            }
-         }
-      }
-   );
-
+      return {
+         key: value.key,
+         value: {
+            value: value.value,
+            group: value.group,
+         },
+      };
+   });
 
    let withGroup = {};
 
    // some src files may not have manifest, it's okay
-   if(settingSrc.manifest?.settingGroups){
+   if (settingSrc.manifest?.settingGroups) {
       let groupedKeys = [];
-      for(const groupName in settingSrc.manifest.settingGroups){
-         for(const key in noGroup){
-            if(groupedKeys.includes(key)) continue;
+      for (const groupName in settingSrc.manifest.settingGroups) {
+         for (const key in noGroup) {
+            if (groupedKeys.includes(key)) continue;
 
-            for(const predicateStr of settingSrc.manifest.settingGroups[groupName]){
-               if(!predicate(predicateStr, key)) continue;
+            for (const predicateStr of settingSrc.manifest.settingGroups[groupName]) {
+               if (!predicate(predicateStr, key)) continue;
 
-               if(withGroup[groupName] === undefined)
-                  withGroup[groupName] = {};
+               if (withGroup[groupName] === undefined) withGroup[groupName] = {};
 
                withGroup[groupName][key] = noGroup[key].value;
                groupedKeys.push(key);
@@ -898,25 +881,22 @@ async function writeIniKeyVal(settingScrPath, settingSrc, settings){
             }
          }
       }
-   }
-   else {
-      for(let key in noGroup){
+   } else {
+      for (let key in noGroup) {
          const group = noGroup[key].group;
 
-         if(!group){
+         if (!group) {
             withGroup[key] = noGroup[key].value;
             continue;
          }
 
-         if(!withGroup[group]) withGroup[group] = {};
+         if (!withGroup[group]) withGroup[group] = {};
          withGroup[group][key] = noGroup[key].value;
       }
    }
 
-   if(to.propertiesCount(withGroup) < 1){
-      writeLog(
-         `settings write preparation failed: no settings to write to "${settingScrPath}`, 2
-      );
+   if (to.propertiesCount(withGroup) < 1) {
+      writeLog(`settings write preparation failed: no settings to write to "${settingScrPath}`, 2);
       return;
    }
 
@@ -926,16 +906,15 @@ async function writeIniKeyVal(settingScrPath, settingSrc, settings){
 }
 
 async function writeIniKeyVal_raw(settingScrPath, settingSrc, rawSettings) {
-   if(settingSrc.usedAsRaw)
-      writeLog(to.yuString(rawSettings), 4);
+   if (settingSrc.usedAsRaw) writeLog(to.yuString(rawSettings), 4);
 
    let errorMsg;
-   switch(settingSrc.type){
+   switch (settingSrc.type) {
       case 'plainText':
          to.writeConfig(rawSettings, settingScrPath, {
             useIniGroup: true,
             mode: settingSrc.usedAsRaw ? 'replace' : 'merge',
-            minify: true
+            minify: true,
          });
          break;
       case 'sqlite':
@@ -943,8 +922,7 @@ async function writeIniKeyVal_raw(settingScrPath, settingSrc, rawSettings) {
          break;
    }
 
-   if(errorMsg)
-      throw new Error(errorMsg);
+   if (errorMsg) throw new Error(errorMsg);
 }
 
 // Parse SQLite uses the same function as IniKeyVal,
@@ -956,20 +934,20 @@ async function writeIniKeyVal_raw(settingScrPath, settingSrc, rawSettings) {
  * @param {string} filePath database path
  * @returns {Promise<string|undefined>} error message if any
  */
-async function writeSQLite(filePath, settingSrc, settings){
-   if(settingSrc.manifest?.selectedTable === undefined){
+async function writeSQLite(filePath, settingSrc, settings) {
+   if (settingSrc.manifest?.selectedTable === undefined) {
       writeLog(`Manifest: ${to.yuString(settingSrc.manifest)}`, 2);
       return writeLog(
-         `unable to write to SQLite database: missing "selectedTable" property in source metadata`, 2
+         `unable to write to SQLite database: missing "selectedTable" property in source metadata`,
+         2
       );
    }
 
-   if(typeof settingSrc.manifest.Replacer == 'string'){
+   if (typeof settingSrc.manifest.Replacer == 'string') {
       return writeLog('program not properly initialized: Replacer is not a function', 2);
    }
 
-   if(filePath.startsWith('.'))
-      filePath = path.resolve(config.gameInstalledPath, filePath);
+   if (filePath.startsWith('.')) filePath = path.resolve(config.gameInstalledPath, filePath);
 
    writeLog(`Writing to SQLite database "${filePath}"`);
 
@@ -985,48 +963,40 @@ async function writeSQLite(filePath, settingSrc, settings){
       writeLog(`Opening SQLite database from "${filePath}"`);
       db = await sqlite.open(filePath);
 
-      for(const key in settings){
-         if(
-            settingSrc.manifest.acceptedGroups.includes(key) &&
-            settingSrc.manifest.acceptedGroups.length
-         ){
+      for (const key in settings) {
+         if (settingSrc.manifest.acceptedGroups.includes(key) && settingSrc.manifest.acceptedGroups.length) {
             writeLog(
-               `Error writting to SQLite database "${filePath}": the key "${key}" does not exist in settings`, 2
+               `Error writting to SQLite database "${filePath}": the key "${key}" does not exist in settings`,
+               2
             );
             continue;
          }
 
-         const strValue = typeof settings[key] == 'string' // the Database only accepts string
-            ? settings[key]
-            : JSON.stringify(settings[key], settingSrc.manifest.Replacer);
+         const strValue =
+            typeof settings[key] == 'string' // the Database only accepts string
+               ? settings[key]
+               : JSON.stringify(settings[key], settingSrc.manifest.Replacer);
 
          const res = await db.all(
             `SELECT value FROM ${settingSrc.manifest.selectedTable} WHERE key = \'${key}\'`
          );
          let query = `UPDATE ${settingSrc.manifest.selectedTable} SET value = '${strValue}' WHERE key = '${key}'`;
 
-         if(!res.length){
+         if (!res.length) {
             query = `INSERT INTO ${settingSrc.manifest.selectedTable} (key, value) VALUES ('${key}', '${strValue}')`;
-         }
-         else if(settings[key] === undefined){
+         } else if (settings[key] === undefined) {
             query = `DELETE FROM ${settingSrc.manifest.selectedTable} WHERE key = '${key}'`;
-         }
-         else if(strValue === res[0].value) continue;
+         } else if (strValue === res[0].value) continue;
 
          await db.all(query);
       }
-   }
-   catch (e) {
+   } catch (e) {
       writeLog(to.yuString(e), 2);
-      return writeLog(
-         `Error writting to SQLite database "${filePath}": ${e.message}`, 2
-      );
-   }
-   finally {
+      return writeLog(`Error writting to SQLite database "${filePath}": ${e.message}`, 2);
+   } finally {
       db?.close();
    }
 }
-
 
 /*
 sqlite> SELECT value FROM LocalStorage WHERE key == 'CombineAction';
@@ -1038,101 +1008,102 @@ sqlite> SELECT value FROM LocalStorage WHERE key == 'CombineAction';
  * @param {ParsedGameSettings} parsed
  * @param {AllRawSettings} raw
  */
-async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
+async function writeKBTupleMap(settingScrPath, parsed, patch, raw) {
    let combineActionMap = new Map();
 
    const mappedSettings = to.remap(parsed, (key, setting, currMap) => {
-      if(!(setting.type === 'bindings' || setting.type === 'axis')||!(setting.value instanceof Array)){
+      if (!(setting.type === 'bindings' || setting.type === 'axis') || !(setting.value instanceof Array)) {
          writeLog(`invalid type "${setting.type}" for KBTupleMap`, 2);
          return;
       }
 
       let serialized = '';
 
-      if(setting.type === 'bindings'){
+      if (setting.type === 'bindings') {
          /**@type {KeyBind} */
          let binding;
          // @ts-expect-error this should already be a type of KeyBind
-         for(binding of setting.value){
+         for (binding of setting.value) {
             /**
              * @example
              * //           v for some binding that requires multiple keys (w/o modifiers) to be pressed at the same time (length == 1 for single keybinds)
              * gameDefKeys[KeyPerAction][KeyNames]
              * //                         ^ for some key that have multiple names for different devices
              */
-            let gameDefKeys = (binding.value instanceof Array ? binding.value : [binding.value])
-               .map(appDefKey => {
+            let gameDefKeys = (binding.value instanceof Array ? binding.value : [binding.value]).map(
+               appDefKey => {
                   /**
                    * @type {string|string[]}
                    *                maybe undefined for keyboard bindings  v  (not all keys are defined in patch.json)
                    */
-                  let gameDefKey = patch.bindingsDeclaration[binding.type][appDefKey] ?? appDefKey.toUpperCase();
-                  if(!(gameDefKey instanceof Array)) gameDefKey = [gameDefKey];
+                  let gameDefKey =
+                     patch.bindingsDeclaration[binding.type][appDefKey] ?? appDefKey.toUpperCase();
+                  if (!(gameDefKey instanceof Array)) gameDefKey = [gameDefKey];
                   return gameDefKey;
-               });
+               }
+            );
 
             // combineAction: we neet to define this in combineAction from LocalStorage.db
-            if(gameDefKeys.length > 1){
-               if(!combineActionMap.has(setting.key))
-                  combineActionMap.set(setting.key, []);
+            if (gameDefKeys.length > 1) {
+               if (!combineActionMap.has(setting.key)) combineActionMap.set(setting.key, []);
 
-               for(let actIndex = 0; actIndex < gameDefKeys.length - 1; actIndex++){
-                  for(let keyIndex = 0; ; keyIndex++){
-                     if(!gameDefKeys[actIndex][keyIndex]) break;
+               for (let actIndex = 0; actIndex < gameDefKeys.length - 1; actIndex++) {
+                  for (let keyIndex = 0; ; keyIndex++) {
+                     if (!gameDefKeys[actIndex][keyIndex]) break;
 
-                     combineActionMap.get(setting.key).push([
-                        ...gameDefKeys.map(row => row[keyIndex])
-                     ]);
+                     combineActionMap.get(setting.key).push([...gameDefKeys.map(row => row[keyIndex])]);
                   }
                }
                continue;
             }
 
-            for(const eachKeyName of gameDefKeys[0]){
-               serialized += `ActionMappings=(ActionName="${setting.key}",bShift=${binding.modifier.Shift?'True':'False'},bCtrl=${binding.modifier.Ctrl?'True':'False'},bAlt=${binding.modifier.Alt?'True':'False'},bCmd=${binding.modifier.Cmd?'True':'False'},Key=${eachKeyName})\n`
+            for (const eachKeyName of gameDefKeys[0]) {
+               serialized += `ActionMappings=(ActionName="${setting.key}",bShift=${binding.modifier.Shift ? 'True' : 'False'},bCtrl=${binding.modifier.Ctrl ? 'True' : 'False'},bAlt=${binding.modifier.Alt ? 'True' : 'False'},bCmd=${binding.modifier.Cmd ? 'True' : 'False'},Key=${eachKeyName})\n`;
             }
          }
-      }else{
+      } else {
          /**@type {AxisBind} */
          let binding;
          // @ts-expect-error this should already be a type of AxisBind
-         for(binding of setting.value){
+         for (binding of setting.value) {
             const appDefKey = binding.value;
             /**
              * @type {string|string[]}
              *                maybe undefined for keyboard bindings  v  (not all keys are defined in patch.json)
              */
 
-            let gameDefKey = patch.axisDeclaration[binding.type]?.[appDefKey]
-                  ?? patch.bindingsDeclaration[binding.type]?.[appDefKey]
-                  ?? appDefKey.toUpperCase();
+            let gameDefKey =
+               patch.axisDeclaration[binding.type]?.[appDefKey] ??
+               patch.bindingsDeclaration[binding.type]?.[appDefKey] ??
+               appDefKey.toUpperCase();
 
-            if(!(gameDefKey instanceof Array)) gameDefKey = [gameDefKey];
+            if (!(gameDefKey instanceof Array)) gameDefKey = [gameDefKey];
 
-            for(const eachGDK of gameDefKey){
-               serialized += `AxisMappings=(AxisName="${setting.key}",Scale=${binding.scale.toFixed(6)},Key=${eachGDK})\n`
+            for (const eachGDK of gameDefKey) {
+               serialized += `AxisMappings=(AxisName="${setting.key}",Scale=${binding.scale.toFixed(6)},Key=${eachGDK})\n`;
             }
          }
       }
 
       // @ts-expect-error currMap is a Map (same as input type)
-      if(currMap.has(setting.group)){
+      if (currMap.has(setting.group)) {
          // @ts-expect-error currMap is a Map (same as input type)
          currMap.get(setting.group).push({
             str: serialized,
             group: setting.group,
-            type: setting.type
+            type: setting.type,
          });
-
-      }else{
+      } else {
          return {
             key: setting.group,
-            value: [{
-               str: serialized,
-               group: setting.group,
-               type: setting.type
-            }]
-         }
+            value: [
+               {
+                  str: serialized,
+                  group: setting.group,
+                  type: setting.type,
+               },
+            ],
+         };
       }
 
       return undefined;
@@ -1141,9 +1112,9 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
    // merge combined actions that have been parsed and the original ones
    /**@type {Map} */
    const originalCA = raw.get('combinedAction')?.value?.['CombineAction'];
-   if(originalCA){
+   if (originalCA) {
       originalCA.forEach((value, key) => {
-         if(!combineActionMap.has(key)&&!parsed.has(key)){
+         if (!combineActionMap.has(key) && !parsed.has(key)) {
             combineActionMap.set(key, value);
          }
       });
@@ -1152,16 +1123,13 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
    // write combined actions
    {
       const CASrcMeta = patch.configSrcMap.combinedAction;
-      const error = await writeSQLite(
-         CASrcMeta.path,
-         CASrcMeta,
-         {  // for KBTupleMap 'CombinedAction' is the only accepted group however,
-            // this may change in the future
-            [CASrcMeta.manifest.acceptedGroups[0]]: combineActionMap
-         }
-      );
+      const error = await writeSQLite(CASrcMeta.path, CASrcMeta, {
+         // for KBTupleMap 'CombinedAction' is the only accepted group however,
+         // this may change in the future
+         [CASrcMeta.manifest.acceptedGroups[0]]: combineActionMap,
+      });
 
-      if(error){
+      if (error) {
          writeLog(`failed to write combined actions to "${CASrcMeta.path}"`, 2);
          // even if it fails, we can still write the rest of the settings
       }
@@ -1169,7 +1137,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
 
    let content = '';
    // @ts-expect-error mappedSettings is a Map
-   for(const [group, settings] of mappedSettings){
+   for (const [group, settings] of mappedSettings) {
       content += `[${group}]\n`;
       content += settings.reduce((acc, curr) => acc + curr.str, '');
    }
@@ -1177,8 +1145,7 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
    try {
       writeLog(`Writing KBTupleMap to "${settingScrPath}"`);
       fs.writeFileSync(settingScrPath, content, { encoding: 'utf-8' });
-   }
-   catch(e){
+   } catch (e) {
       writeLog(`Error writing to "${settingScrPath}": ${e.message}`, 1);
       throw e; // let the caller handle the error
    }
@@ -1192,54 +1159,50 @@ async function writeKBTupleMap(settingScrPath, parsed, patch, raw){
  * @param {Map<string, ParsedGameSettingObj>} settings
  * @param {boolean} typeParsing whether to parse the value from JavaScript type back to string
  */
-async function writeLiteral(settingScrPath, settingSrc, settings, typeParsing){
-   let objSettings = to.remap(Object.fromEntries(settings),
-      (key, value) =>  {
-         let settingValue = value.value;
-         typeCheck(value.value, value.type, key, "Literal");
+async function writeLiteral(settingScrPath, settingSrc, settings, typeParsing) {
+   let objSettings = to.remap(Object.fromEntries(settings), (key, value) => {
+      let settingValue = value.value;
+      typeCheck(value.value, value.type, key, 'Literal');
 
-         if(typeof settingSrc.manifest.writeMapper == 'function'){
-            const mapped = settingSrc.manifest.writeMapper(key, value.value);
-            key = mapped.key;
-            settingValue = mapped.value;
-         }
-
-         return {
-            key: value.key,
-            value: {
-               value: typeParsing && !(settingValue == undefined || settingValue == null)?  settingValue.toString(): settingValue,
-               group: value.group
-            }
-         }
+      if (typeof settingSrc.manifest.writeMapper == 'function') {
+         const mapped = settingSrc.manifest.writeMapper(key, value.value);
+         key = mapped.key;
+         settingValue = mapped.value;
       }
-   );
 
+      return {
+         key: value.key,
+         value: {
+            value:
+               typeParsing && !(settingValue == undefined || settingValue == null)
+                  ? settingValue.toString()
+                  : settingValue,
+            group: value.group,
+         },
+      };
+   });
 
    let serializedSettings = {};
-   for(let key in objSettings){
+   for (let key in objSettings) {
       serializedSettings[key] = objSettings[key].value;
    }
 
-   if(to.propertiesCount(serializedSettings) < 1){
-      writeLog(
-         `settings write preparation failed: no settings to write to "${settingScrPath}`, 2
-      );
+   if (to.propertiesCount(serializedSettings) < 1) {
+      writeLog(`settings write preparation failed: no settings to write to "${settingScrPath}`, 2);
       return;
    }
 
    writeLog(`Writing Literal to "${settingScrPath}" with type "${settingSrc.type}"`);
 
    let errorMsg;
-   switch(settingSrc.type){
+   switch (settingSrc.type) {
       case 'sqlite':
          errorMsg = await writeSQLite(settingScrPath, settingSrc, serializedSettings);
          break;
    }
 
-   if(errorMsg)
-      throw new Error(errorMsg);
+   if (errorMsg) throw new Error(errorMsg);
 }
-
 
 /**
  * lookup key name used in this program from the key name in the config file (convert what game calls the key to what this program calls it)
@@ -1248,35 +1211,34 @@ async function writeLiteral(settingScrPath, settingSrc, settings, typeParsing){
  * @param {string[]} blacklist group name blacklist
  * @returns {{key: Keys|Axis|Modifiers, deviceType: DeviceTypesWithModifiers}}
  */
-function getKeyFromBindingDeclaration(declarations, value, blacklist = []){
-   if(!(declarations instanceof Array)) declarations = [declarations];
+function getKeyFromBindingDeclaration(declarations, value, blacklist = []) {
+   if (!(declarations instanceof Array)) declarations = [declarations];
 
-   for(const declGroup of declarations){
-      for(const deviceType in declGroup){
-         if(blacklist.includes(deviceType)) continue;
+   for (const declGroup of declarations) {
+      for (const deviceType in declGroup) {
+         if (blacklist.includes(deviceType)) continue;
 
-         for(let [key, dValue] of Object.entries(declGroup[deviceType])){
+         for (let [key, dValue] of Object.entries(declGroup[deviceType])) {
             // @ts-expect-error
-            if(dValue instanceof Array){
-               if(dValue.includes(value)){
+            if (dValue instanceof Array) {
+               if (dValue.includes(value)) {
                   // @ts-expect-error
-                  return {key, deviceType};
+                  return { key, deviceType };
                }
                continue;
             }
 
-            if(dValue === value){
+            if (dValue === value) {
                // @ts-expect-error
-               return {key, deviceType};
+               return { key, deviceType };
             }
          }
       }
    }
 
    // @ts-expect-error
-   return {key: value, deviceType: 'keyboard'};
+   return { key: value, deviceType: 'keyboard' };
 }
-
 
 module.exports = {
    loadIniKeyVal,
@@ -1293,5 +1255,5 @@ module.exports = {
    writeSQLite,
    writeLiteral,
    KeyBind,
-   AxisBind
+   AxisBind,
 };
