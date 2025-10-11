@@ -1096,7 +1096,7 @@ async function showSettings(group, settingsMap, settingTFIDF, settingSearchField
                return;
             }
 
-            if(key == terminal.Keys.BACKSPACE){
+            if(terminal.Keys.isBackspace(key)){
                if(Math.abs(cursorPos) >= searchQuery.length) return;
                if(cursorPos >= 0) searchQuery = searchQuery.slice(0, -1);
                else searchQuery = to.strSplice(searchQuery, cursorPos - 1, 1);
@@ -1300,7 +1300,7 @@ async function showSettingEditMenu(settingsMap, settingIndex){
                forceApply = false;
             }
 
-            if(key == terminal.Keys.BACKSPACE){
+            if(terminal.Keys.isBackspace(key)){
                if(Math.abs(cursorPos) >= textField.length) return;
                if(cursorPos >= 0) textField = textField.slice(0, -1);
                else textField = to.strSplice(textField, cursorPos - 1, 1);
@@ -1560,7 +1560,7 @@ async function showSettingEditMenu(settingsMap, settingIndex){
                   KBEdit_gotoStep(1);
 
 
-               }else if(key == terminal.Keys.BACKSPACE){ // delete a key in current binding
+               }else if(terminal.Keys.isBackspace(key)){ // delete a key in current binding
                   if(textInputMode) break; // text input will be handled above
 
                   if(newBinding.value != null){
